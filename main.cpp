@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
+#include <wrl/client.h>
 #include <fstream>
 #include <sstream>
 #include <imgui.h>
@@ -107,12 +109,13 @@ bool initialized = false;
 ProcessorRegisters currentRegisters = {};
 HWND hwnd = nullptr;
 WNDPROC oWndProc = nullptr;
-ID3D11Device* device = nullptr;
-ID3D11DeviceContext* context = nullptr;
-ID3D11RenderTargetView* mainRenderTargetView = nullptr;
+Microsoft::WRL::ComPtr<ID3D11Device> device;
+Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+Microsoft::WRL::ComPtr<ID3D11RenderTargetView> mainRenderTargetView;
 lua_State* L = nullptr;
 std::atomic<bool> stopMonitoring{ false };
-std::map<std::string, Plugin> loadedPlugins;
+std::unordered_map<std::string, Plugin> loadedPlugins;
+std::thread monitorThread;
 int currentWidth = 0;
 int currentHeight = 0;
 std::map<DWORD, BreakpointInfo> breakpointInfo;
@@ -225,18 +228,16 @@ void LoadConfig() {
 
 // --- Key Mapping ---
 int GetVirtualKeyFromName(const string& keyName) {
-    if (keyName == "F1") return VK_F1;
-    if (keyName == "F2") return VK_F2;
-    if (keyName == "F3") return VK_F3;
-    if (keyName == "F4") return VK_F4;
-    if (keyName == "F5") return VK_F5;
-    if (keyName == "F6") return VK_F6;
-    if (keyName == "F7") return VK_F7;
-    if (keyName == "F8") return VK_F8;
-    if (keyName == "F9") return VK_F9;
-    if (keyName == "F10") return VK_F10;
-    if (keyName == "F11") return VK_F11;
-    if (keyName == "F12") return VK_F12;
+    static const std::unordered_map<std::string, int> keyMap = {
+        {"F1", VK_F1}, {"F2", VK_F2}, {"F3", VK_F3}, {"F4", VK_F4},
+        {"F5", VK_F5}, {"F6", VK_F6}, {"F7", VK_F7}, {"F8", VK_F8},
+        {"F9", VK_F9}, {"F10", VK_F10}, {"F11", VK_F11}, {"F12", VK_F12}
+    };
+
+    auto it = keyMap.find(keyName);
+    if (it != keyMap.end()) {
+        return it->second;
+    }
 
     if (!keyName.empty()) {
         return toupper(keyName[0]);
@@ -673,7 +674,7 @@ void RebuildPluginsVector() {
 }
 
 void LoadPluginsWithoutExecution() {
-    std::map<std::string, Plugin> newPlugins;
+    std::unordered_map<std::string, Plugin> newPlugins;
 
     if (!fs::exists(config.pluginFolder)) {
         try {
@@ -774,7 +775,7 @@ void ExecuteAllPlugins() {
 }
 
 void UpdateSinglePlugin(const std::string& baseName) {
-    static std::map<std::string, Plugin> lastPluginState;
+    static std::unordered_map<std::string, Plugin> lastPluginState;
 
     std::string iniPath = config.pluginFolder + "/" + baseName + ".ini";
     std::string luaPath = config.pluginFolder + "/" + baseName + ".lua";
@@ -838,69 +839,47 @@ void UpdateSinglePlugin(const std::string& baseName) {
 }
 
 void MonitorDirectoryChanges(const std::string& directory) {
-    WIN32_FIND_DATAA findData;
-    std::string searchPath = directory + "\\*.*";
-    HANDLE hFind = INVALID_HANDLE_VALUE;
-    std::map<std::string, FILETIME> lastWriteTimes;
-    bool firstRun = true;
+    std::wstring dirW(directory.begin(), directory.end());
+    HANDLE hDir = CreateFileW(dirW.c_str(), FILE_LIST_DIRECTORY,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr, OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+
+    if (hDir == INVALID_HANDLE_VALUE) {
+        Log("Failed to monitor directory: " + directory);
+        return;
+    }
+
+    char buffer[1024];
+    DWORD bytesReturned;
 
     while (!stopMonitoring) {
-        hFind = FindFirstFileA(searchPath.c_str(), &findData);
-        if (hFind == INVALID_HANDLE_VALUE) {
-            Sleep(1000);
-            continue;
-        }
-
-        bool changes = false;
-        do {
-            std::string fileName = findData.cFileName;
-            if (fileName == "." || fileName == "..") continue;
-
-            // Use string_ends_with helper instead of ends_with method
-            if (string_ends_with(fileName, ".lua") || string_ends_with(fileName, ".ini")) {
-                std::string baseName = fileName.substr(0, fileName.find_last_of('.'));
-
-                if (!map_contains(lastWriteTimes, fileName)) {
-                    if (!firstRun) {
-                        changes = true;
-                        UpdateSinglePlugin(baseName);
-                    }
-                    lastWriteTimes[fileName] = findData.ftLastWriteTime;
-                }
-                else if (CompareFileTime(&lastWriteTimes[fileName], &findData.ftLastWriteTime) != 0) {
-                    changes = true;
-                    lastWriteTimes[fileName] = findData.ftLastWriteTime;
+        if (ReadDirectoryChangesW(hDir, buffer, sizeof(buffer), FALSE,
+                FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
+                &bytesReturned, nullptr, nullptr)) {
+            FILE_NOTIFY_INFORMATION* fni = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(buffer);
+            bool changed = false;
+            do {
+                std::wstring wname(fni->FileName, fni->FileNameLength / sizeof(WCHAR));
+                std::string fileName(wname.begin(), wname.end());
+                if (string_ends_with(fileName, ".lua") || string_ends_with(fileName, ".ini")) {
+                    std::string baseName = fileName.substr(0, fileName.find_last_of('.'));
                     UpdateSinglePlugin(baseName);
+                    changed = true;
                 }
-            }
-        } while (FindNextFileA(hFind, &findData));
+                if (fni->NextEntryOffset == 0) break;
+                fni = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(reinterpret_cast<BYTE*>(fni) + fni->NextEntryOffset);
+            } while (true);
 
-        FindClose(hFind);
-
-        // Check for deleted files
-        auto it = lastWriteTimes.begin();
-        while (it != lastWriteTimes.end()) {
-            std::string fileName = it->first;
-            std::string fullPath = directory + "\\" + fileName;
-
-            if (GetFileAttributesA(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-                std::string baseName = fileName.substr(0, fileName.find_last_of('.'));
-                UpdateSinglePlugin(baseName);
-                it = lastWriteTimes.erase(it);
-                changes = true;
+            if (changed) {
+                RebuildPluginsVector();
             }
-            else {
-                ++it;
-            }
+        } else {
+            Sleep(500);
         }
-
-        if (changes && !firstRun) {
-            RebuildPluginsVector();
-        }
-
-        firstRun = false;
-        Sleep(100);
     }
+
+    CloseHandle(hDir);
 }
 
 // --- Exception Handler for Breakpoints ---
@@ -997,8 +976,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (device && wParam != SIZE_MINIMIZED) {
             Log("WM_SIZE received in WndProc");
             if (mainRenderTargetView) {
-                mainRenderTargetView->Release();
-                mainRenderTargetView = nullptr;
+                mainRenderTargetView.Reset();
             }
         }
         break;
@@ -1141,8 +1119,8 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
     static bool firstRun = true;
 
     if (!initialized) {
-        if (SUCCEEDED(pSwap->GetDevice(__uuidof(ID3D11Device), (void**)&device))) {
-            device->GetImmediateContext(&context);
+        if (SUCCEEDED(pSwap->GetDevice(__uuidof(ID3D11Device), reinterpret_cast<void**>(device.GetAddressOf())))) {
+            device->GetImmediateContext(context.GetAddressOf());
             DXGI_SWAP_CHAIN_DESC sd;
             pSwap->GetDesc(&sd);
             hwnd = sd.OutputWindow;
@@ -1150,11 +1128,10 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
             currentWidth = sd.BufferDesc.Width;
             currentHeight = sd.BufferDesc.Height;
 
-            ID3D11Texture2D* backBuffer = nullptr;
-            pSwap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+            pSwap->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
             if (backBuffer) {
-                device->CreateRenderTargetView(backBuffer, nullptr, &mainRenderTargetView);
-                backBuffer->Release();
+                device->CreateRenderTargetView(backBuffer.Get(), nullptr, mainRenderTargetView.GetAddressOf());
             }
 
             ImGui::CreateContext();
@@ -1162,7 +1139,7 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
             ImGui_ImplWin32_Init(hwnd);
-            ImGui_ImplDX11_Init(device, context);
+            ImGui_ImplDX11_Init(device.Get(), context.Get());
 
             oWndProc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
 
@@ -1193,11 +1170,10 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
 
         if (!mainRenderTargetView) {
             Log("Recreating render target view");
-            ID3D11Texture2D* backBuffer = nullptr;
-            HRESULT hr = pSwap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+            HRESULT hr = pSwap->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
             if (SUCCEEDED(hr) && backBuffer) {
-                device->CreateRenderTargetView(backBuffer, nullptr, &mainRenderTargetView);
-                backBuffer->Release();
+                device->CreateRenderTargetView(backBuffer.Get(), nullptr, mainRenderTargetView.GetAddressOf());
 
                 ImGui_ImplDX11_InvalidateDeviceObjects();
                 ImGui_ImplDX11_CreateDeviceObjects();
@@ -1253,7 +1229,7 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
         }
 
         ImGui::Render();
-        context->OMSetRenderTargets(1, &mainRenderTargetView, nullptr);
+        context->OMSetRenderTargets(1, mainRenderTargetView.GetAddressOf(), nullptr);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     }
 
@@ -1273,27 +1249,24 @@ void InitHook() {
     scDesc.Windowed = TRUE;
     scDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
-    IDXGISwapChain* tempSwap = nullptr;
-    ID3D11Device* tempDevice = nullptr;
-    ID3D11DeviceContext* tempContext = nullptr;
+    Microsoft::WRL::ComPtr<IDXGISwapChain> tempSwap;
+    Microsoft::WRL::ComPtr<ID3D11Device> tempDevice;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> tempContext;
     D3D_FEATURE_LEVEL featureLevel;
 
     HRESULT hr = D3D11CreateDeviceAndSwapChain(
         nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
         nullptr, 0, D3D11_SDK_VERSION, &scDesc,
-        &tempSwap, &tempDevice, &featureLevel, &tempContext
+        tempSwap.GetAddressOf(), tempDevice.GetAddressOf(), &featureLevel, tempContext.GetAddressOf()
     );
 
     if (SUCCEEDED(hr) && tempSwap) {
-        void** vTable = *reinterpret_cast<void***>(tempSwap);
+        void** vTable = *reinterpret_cast<void***>(tempSwap.Get());
 
         MH_Initialize();
         MH_CreateHook(vTable[8], &hkPresent, reinterpret_cast<void**>(&oPresent));
         MH_EnableHook(vTable[8]);
 
-        tempSwap->Release();
-        tempDevice->Release();
-        tempContext->Release();
 
         Log("Present hook installed successfully");
     }
@@ -1347,8 +1320,7 @@ DWORD WINAPI MainThread(LPVOID) {
     }
 
     // Start monitoring the plugins directory
-    std::thread monitorThread(MonitorDirectoryChanges, config.pluginFolder);
-    monitorThread.detach();
+    monitorThread = std::thread(MonitorDirectoryChanges, config.pluginFolder);
 
     return 0;
 }
@@ -1366,6 +1338,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
 
     case DLL_PROCESS_DETACH:
         stopMonitoring = true;
+        if (monitorThread.joinable()) {
+            monitorThread.join();
+        }
 
         // Remove all breakpoints on exit
         for (auto& pair : breakpointInfo) {
@@ -1385,18 +1360,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
         }
 
         if (mainRenderTargetView) {
-            mainRenderTargetView->Release();
-            mainRenderTargetView = nullptr;
+            mainRenderTargetView.Reset();
         }
 
         if (context) {
-            context->Release();
-            context = nullptr;
+            context.Reset();
         }
 
         if (device) {
-            device->Release();
-            device = nullptr;
+            device.Reset();
         }
 
         ImGui_ImplDX11_Shutdown();
