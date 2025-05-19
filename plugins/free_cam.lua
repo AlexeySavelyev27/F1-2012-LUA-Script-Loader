@@ -41,8 +41,10 @@ end
 local iniPath = debug.getinfo(1, 'S').source:match('@(.+)[/\\]') .. '/free_cam.ini'
 local controls = parseIni(iniPath)
 
+
+local toggleName = controls.FreeCamToggle or 'VK_F1'
 local cfg = {
-    toggle = keyCode(controls.FreeCamToggle or 'VK_F1'),
+    toggle = keyCode(toggleName),
     forward = keyCode(controls.CamForward or 'VK_W'),
     backward = keyCode(controls.CamBackward or 'VK_S'),
     left = keyCode(controls.CamLeft or 'VK_A'),
@@ -133,19 +135,19 @@ local function rotateAround(axis,angle)
 end
 
 local function readOrientation()
-    orient.up    = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x640), readFloat(CamStructure+0x650) }
-    orient.right = { readFloat(CamStructure+0x634), readFloat(CamStructure+0x644), readFloat(CamStructure+0x654) }
 
-    orient.forward= { readFloat(CamStructure+0x638), readFloat(CamStructure+0x648), readFloat(CamStructure+0x658) }
+    orient.up     = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x634), readFloat(CamStructure+0x638) }
+    orient.right  = { readFloat(CamStructure+0x640), readFloat(CamStructure+0x644), readFloat(CamStructure+0x648) }
+    orient.forward= { readFloat(CamStructure+0x650), readFloat(CamStructure+0x654), readFloat(CamStructure+0x658) }
 end
 local function readPosition()
     pos = { readFloat(CamStructure+0x660), readFloat(CamStructure+0x664), readFloat(CamStructure+0x668) }
 end
 local function writeOrientation()
     local vals = {
-        orient.up[1], orient.right[1], orient.forward[1],
-        orient.up[2], orient.right[2], orient.forward[2],
-        orient.up[3], orient.right[3], orient.forward[3]
+        orient.up[1], orient.up[2], orient.up[3],
+        orient.right[1], orient.right[2], orient.right[3],
+        orient.forward[1], orient.forward[2], orient.forward[3]
     }
     local o1 = {0x630,0x634,0x638,0x640,0x644,0x648,0x650,0x654,0x658}
     local o2 = {0x6A0,0x6A4,0x6A8,0x6B0,0x6B4,0x6B8,0x6C0,0x6C4,0x6C8}
@@ -199,11 +201,34 @@ local function disable()
     active = false
 end
 
+local function toEuler()
+    local pitch = math.deg(math.asin(-orient.forward[2]))
+    local yaw = math.deg(math.atan2(orient.forward[1], orient.forward[3]))
+    local roll = math.deg(math.atan2(orient.up[1], orient.up[2]))
+    return pitch,yaw,roll
+end
+
+local function status(state)
+    local pitch,yaw,roll = toEuler()
+    return string.format(
+        "FreeCam %s. Press %s to toggle.\nCurrent coordinates: x = %.2f, y = %.2f, z = %.2f\nCurrent oriantation: pitch = %.2f, yaw = %.2f, roll = %.2f",
+        state, toggleName, pos[1], pos[2], pos[3], pitch, yaw, roll)
+end
+
 function OnFrame()
     if Keyboard.IsKeyPressed(cfg.toggle) then
-        if active then disable() else enable() end
+        if active then
+            disable()
+            SCRIPT_RESULT = status('DISABLED')
+        else
+            enable()
+            SCRIPT_RESULT = status('ENABLED')
+        end
     end
-    if not active then return end
+    if not active then
+        SCRIPT_RESULT = status('DISABLED')
+        return
+    end
 
     local speed = cfg.moveSpeed
     if Keyboard.IsKeyDown(cfg.speedUp) then speed = speed * 10 end
@@ -253,7 +278,12 @@ function OnFrame()
     writeOrientation()
     writePosition()
     writeFov()
+    SCRIPT_RESULT = status('ENABLED')
 end
 
-SCRIPT_RESULT = 'FreeCam loaded'
+CamStructure = ffi.cast('uint32_t*', base + 0xE374CC)[0]
+readOrientation()
+readPosition()
+fov = readFloat(CamStructure+0x670)
+SCRIPT_RESULT = status('loaded')
 
