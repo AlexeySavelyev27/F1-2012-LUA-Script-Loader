@@ -120,6 +120,7 @@ int currentWidth = 0;
 int currentHeight = 0;
 std::map<DWORD, BreakpointInfo> breakpointInfo;
 bool insideBreakpointHandler = false;
+PVOID vehHandle = nullptr;
 int lua_ProtectMemory(lua_State* L);
 
 
@@ -371,6 +372,14 @@ int lua_AllocateMemory(lua_State* L) {
     return 1;
 }
 
+// Frees memory previously allocated with AllocateMemory
+int lua_FreeMemory(lua_State* L) {
+    void* memory = (void*)luaL_checkinteger(L, 1);
+    BOOL result = VirtualFree(memory, 0, MEM_RELEASE);
+    lua_pushboolean(L, result);
+    return 1;
+}
+
 int lua_GetModuleBase(lua_State* L) {
     const char* moduleName = luaL_checkstring(L, 1);
     HMODULE hModule = GetModuleHandleA(moduleName);
@@ -619,6 +628,11 @@ void SetupLuaKeyboardAPI() {
 
     lua_pushstring(L, "AllocateMemory");
     lua_pushcfunction(L, lua_AllocateMemory);
+    lua_settable(L, -3);
+
+    // FreeMemory
+    lua_pushstring(L, "FreeMemory");
+    lua_pushcfunction(L, lua_FreeMemory);
     lua_settable(L, -3);
 
     lua_pushstring(L, "ProtectMemory");
@@ -1332,6 +1346,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
         DisableThreadLibraryCalls(hinstDLL);
         // Set up exception handler before starting the main thread
         SetUnhandledExceptionFilter(BreakpointExceptionHandler);
+        vehHandle = AddVectoredExceptionHandler(1, BreakpointExceptionHandler);
         LoadConfig();
         CreateThread(nullptr, 0, MainThread, nullptr, 0, nullptr);
         break;
@@ -1340,6 +1355,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
         stopMonitoring = true;
         if (monitorThread.joinable()) {
             monitorThread.join();
+        }
+
+        if (hwnd && oWndProc) {
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
+            oWndProc = nullptr;
+            hwnd = nullptr;
         }
 
         // Remove all breakpoints on exit
@@ -1377,6 +1398,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
 
         MH_DisableHook(MH_ALL_HOOKS);
         MH_Uninitialize();
+
+        if (vehHandle) {
+            RemoveVectoredExceptionHandler(vehHandle);
+            vehHandle = nullptr;
+        }
 
         if (logFile.is_open()) {
             Log("DLL detached - shutting down");
