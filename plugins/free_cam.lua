@@ -51,7 +51,6 @@ end
 local iniPath = debug.getinfo(1, 'S').source:match('@(.+)[/\\]') .. '/free_cam.ini'
 local controls = parseIni(iniPath)
 
-
 local toggleName = controls.FreeCamToggle or 'F1'
 local cfg = {
     toggle = keyCode(toggleName),
@@ -148,18 +147,19 @@ local function rotateAround(axis,angle)
 end
 
 local function readOrientation()
-    orient.right  = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x640), readFloat(CamStructure+0x650) }
-    orient.up     = { readFloat(CamStructure+0x634), readFloat(CamStructure+0x644), readFloat(CamStructure+0x654) }
-    orient.forward= { readFloat(CamStructure+0x638), readFloat(CamStructure+0x648), readFloat(CamStructure+0x658) }
+    orient.up     = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x634), readFloat(CamStructure+0x638) }
+    orient.right  = { readFloat(CamStructure+0x640), readFloat(CamStructure+0x644), readFloat(CamStructure+0x648) }
+    orient.forward= { readFloat(CamStructure+0x650), readFloat(CamStructure+0x654), readFloat(CamStructure+0x658) }
 end
+
 local function readPosition()
     pos = { readFloat(CamStructure+0x660), readFloat(CamStructure+0x664), readFloat(CamStructure+0x668) }
 end
 local function writeOrientation()
     local vals = {
-        orient.right[1], orient.up[1], orient.forward[1],
-        orient.right[2], orient.up[2], orient.forward[2],
-        orient.right[3], orient.up[3], orient.forward[3]
+        orient.up[1], orient.up[2], orient.up[3],
+        orient.right[1], orient.right[2], orient.right[3],
+        orient.forward[1], orient.forward[2], orient.forward[3]
     }
     local o1 = {0x630,0x634,0x638,0x640,0x644,0x648,0x650,0x654,0x658}
     local o2 = {0x6A0,0x6A4,0x6A8,0x6B0,0x6B4,0x6B8,0x6C0,0x6C4,0x6C8}
@@ -251,26 +251,31 @@ function OnFrame()
         pos[2] = pos[2] + orient.forward[2]*speed
         pos[3] = pos[3] + orient.forward[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.backward) then
         pos[1] = pos[1] - orient.forward[1]*speed
         pos[2] = pos[2] - orient.forward[2]*speed
         pos[3] = pos[3] - orient.forward[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.left) then
-        pos[1] = pos[1] - orient.right[1]*speed
-        pos[2] = pos[2] - orient.right[2]*speed
-        pos[3] = pos[3] - orient.right[3]*speed
-    end
-    if Keyboard.IsKeyDown(cfg.right) then
         pos[1] = pos[1] + orient.right[1]*speed
         pos[2] = pos[2] + orient.right[2]*speed
         pos[3] = pos[3] + orient.right[3]*speed
     end
+
+    if Keyboard.IsKeyDown(cfg.right) then
+        pos[1] = pos[1] - orient.right[1]*speed
+        pos[2] = pos[2] - orient.right[2]*speed
+        pos[3] = pos[3] - orient.right[3]*speed
+    end
+
     if Keyboard.IsKeyDown(cfg.up) then
         pos[1] = pos[1] + orient.up[1]*speed
         pos[2] = pos[2] + orient.up[2]*speed
         pos[3] = pos[3] + orient.up[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.down) then
         pos[1] = pos[1] - orient.up[1]*speed
         pos[2] = pos[2] - orient.up[2]*speed
@@ -278,9 +283,9 @@ function OnFrame()
     end
 
     if Keyboard.IsKeyDown(cfg.fovUp) then
-        fov = fov + 1
+        fov = fov + speed
     elseif Keyboard.IsKeyDown(cfg.fovDown) then
-        fov = fov - 1
+        fov = fov - speed
     end
 
     local rollSpeed = 0.01
@@ -291,6 +296,7 @@ function OnFrame()
     end
 
     local dx, dy = mouseDelta()
+
     if dx ~= 0 then rotateAround(orient.up, dx * cfg.mouseSens) end
     if dy ~= 0 then rotateAround(orient.right, dy * cfg.mouseSens) end
 
