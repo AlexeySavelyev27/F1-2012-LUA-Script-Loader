@@ -135,6 +135,7 @@ end
 local function readOrientation()
     orient.up    = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x640), readFloat(CamStructure+0x650) }
     orient.right = { readFloat(CamStructure+0x634), readFloat(CamStructure+0x644), readFloat(CamStructure+0x654) }
+
     orient.forward= { readFloat(CamStructure+0x638), readFloat(CamStructure+0x648), readFloat(CamStructure+0x658) }
 end
 local function readPosition()
