@@ -26,34 +26,46 @@ local function parseIni(path)
 end
 
 -- Key conversion helper
+local vkeys = {
+    BACKSPACE = 0x08, TAB = 0x09, ENTER = 0x0D, SHIFT = 0x10, CTRL = 0x11,
+    ALT = 0x12, PAUSE = 0x13, CAPSLOCK = 0x14, ESC = 0x1B, SPACE = 0x20,
+    PAGEUP = 0x21, PAGEDOWN = 0x22, END = 0x23, HOME = 0x24,
+    LEFT = 0x25, UP = 0x26, RIGHT = 0x27, DOWN = 0x28,
+    INSERT = 0x2D, DELETE = 0x2E,
+    LSHIFT = 0xA0, RSHIFT = 0xA1, LCTRL = 0xA2, RCTRL = 0xA3,
+    LALT = 0xA4, RALT = 0xA5
+}
+for i=0,9 do vkeys[tostring(i)] = 0x30 + i end
+for i=0,25 do vkeys[string.char(65+i)] = 0x41 + i end
+for i=1,12 do vkeys['F'..i] = 0x6F + i end
+
 local function keyCode(name)
+    if not name then return 0 end
+    name = name:upper()
     if tonumber(name) then return tonumber(name) end
-    if Keys and Keys[name] then return Keys[name] end
-    if name:sub(1,2) == '0x' or name:sub(1,2) == '0X' then
-        return tonumber(name)
-    end
-    if #name == 1 then
-        return string.byte(name:upper())
-    end
+    if vkeys[name] then return vkeys[name] end
+    if name:sub(1,2) == '0X' then return tonumber(name) end
     return 0
 end
 
 local iniPath = debug.getinfo(1, 'S').source:match('@(.+)[/\\]') .. '/free_cam.ini'
 local controls = parseIni(iniPath)
 
-
-local toggleName = controls.FreeCamToggle or 'VK_F1'
+local toggleName = controls.FreeCamToggle or 'F1'
 local cfg = {
     toggle = keyCode(toggleName),
-    forward = keyCode(controls.CamForward or 'VK_W'),
-    backward = keyCode(controls.CamBackward or 'VK_S'),
-    left = keyCode(controls.CamLeft or 'VK_A'),
-    right = keyCode(controls.CamRight or 'VK_D'),
-    up = keyCode(controls.CamUp or 'VK_SPACE'),
-    down = keyCode(controls.CamDown or 'VK_SHIFT'),
-    rollLeft = keyCode(controls.CamRollLeft or 'VK_Q'),
-    rollRight = keyCode(controls.CamRollRight or 'VK_E'),
-    speedUp = keyCode(controls.SpeedUp or 'VK_LSHIFT'),
+    forward = keyCode(controls.CamForward or 'W'),
+    backward = keyCode(controls.CamBackward or 'S'),
+    left = keyCode(controls.CamLeft or 'A'),
+    right = keyCode(controls.CamRight or 'D'),
+    up = keyCode(controls.CamUp or 'SPACE'),
+    down = keyCode(controls.CamDown or 'SHIFT'),
+    rollLeft = keyCode(controls.CamRollLeft or 'Q'),
+    rollRight = keyCode(controls.CamRollRight or 'E'),
+    speedUp = keyCode(controls.SpeedUp or 'LSHIFT'),
+    slowDown = keyCode(controls.SlowDown or 'LCTRL'),
+    fovUp = keyCode(controls.FovUp or 'PAGEUP'),
+    fovDown = keyCode(controls.FovDown or 'PAGEDOWN'),
     moveSpeed = tonumber(controls.MovementSpeed) or 0.05,
     mouseSens = tonumber(controls.MouseSensitivity) or 0.005
 }
@@ -135,11 +147,11 @@ local function rotateAround(axis,angle)
 end
 
 local function readOrientation()
-
     orient.up     = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x634), readFloat(CamStructure+0x638) }
     orient.right  = { readFloat(CamStructure+0x640), readFloat(CamStructure+0x644), readFloat(CamStructure+0x648) }
     orient.forward= { readFloat(CamStructure+0x650), readFloat(CamStructure+0x654), readFloat(CamStructure+0x658) }
 end
+
 local function readPosition()
     pos = { readFloat(CamStructure+0x660), readFloat(CamStructure+0x664), readFloat(CamStructure+0x668) }
 end
@@ -232,36 +244,48 @@ function OnFrame()
 
     local speed = cfg.moveSpeed
     if Keyboard.IsKeyDown(cfg.speedUp) then speed = speed * 10 end
+    if Keyboard.IsKeyDown(cfg.slowDown) then speed = speed / 10 end
 
     if Keyboard.IsKeyDown(cfg.forward) then
         pos[1] = pos[1] + orient.forward[1]*speed
         pos[2] = pos[2] + orient.forward[2]*speed
         pos[3] = pos[3] + orient.forward[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.backward) then
         pos[1] = pos[1] - orient.forward[1]*speed
         pos[2] = pos[2] - orient.forward[2]*speed
         pos[3] = pos[3] - orient.forward[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.left) then
         pos[1] = pos[1] + orient.right[1]*speed
         pos[2] = pos[2] + orient.right[2]*speed
         pos[3] = pos[3] + orient.right[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.right) then
         pos[1] = pos[1] - orient.right[1]*speed
         pos[2] = pos[2] - orient.right[2]*speed
         pos[3] = pos[3] - orient.right[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.up) then
         pos[1] = pos[1] + orient.up[1]*speed
         pos[2] = pos[2] + orient.up[2]*speed
         pos[3] = pos[3] + orient.up[3]*speed
     end
+
     if Keyboard.IsKeyDown(cfg.down) then
         pos[1] = pos[1] - orient.up[1]*speed
         pos[2] = pos[2] - orient.up[2]*speed
         pos[3] = pos[3] - orient.up[3]*speed
+    end
+
+    if Keyboard.IsKeyDown(cfg.fovUp) then
+        fov = fov + speed
+    elseif Keyboard.IsKeyDown(cfg.fovDown) then
+        fov = fov - speed
     end
 
     local rollSpeed = 0.01
@@ -272,8 +296,9 @@ function OnFrame()
     end
 
     local dx, dy = mouseDelta()
-    if dx ~= 0 then rotateAround(orient.up, -dx * cfg.mouseSens) end
-    if dy ~= 0 then rotateAround(orient.right, -dy * cfg.mouseSens) end
+
+    if dx ~= 0 then rotateAround(orient.up, dx * cfg.mouseSens) end
+    if dy ~= 0 then rotateAround(orient.right, dy * cfg.mouseSens) end
 
     writeOrientation()
     writePosition()
