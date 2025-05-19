@@ -81,6 +81,16 @@ end
 local base = Memory.GetModuleBase('F1_2012.exe')
 local CamStructure
 
+local function findCamStructure()
+    local ptr = Memory.ReadMemory(base + 0xE374CC, 4)
+    if ptr and ptr ~= 0 then
+        CamStructure = ptr
+        return true
+    end
+    CamStructure = nil
+    return false
+end
+
 local renderOffsets = {0x26C0B7,0x26C0C5,0x26C0D3,0x26C0E1,0x26C0F0,0x26C100,0x26C110,0x26C120,0x26C130,0x26C140,0x26C150,0x26C15D}
 local camOffsets    = {0x26C16A,0x26C178,0x26C186,0x26C194,0x26C1A3,0x26C1B3,0x26C1C3,0x26C1D3,0x26C1E3,0x26C1F3,0x26C203,0x26C211}
 local patchSize     = {7,7,7,7,8,8,8,8,8,8,8,6}
@@ -195,9 +205,11 @@ local function mouseDelta()
 end
 
 local function enable()
+    if not findCamStructure() then
+        return false
+    end
     patch(renderOffsets)
     patch(camOffsets)
-    CamStructure = ffi.cast('uint32_t*', base + 0xE374CC)[0]
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
@@ -206,6 +218,7 @@ local function enable()
     prevMouse.x = pt[0].x
     prevMouse.y = pt[0].y
     active = true
+    return true
 end
 
 local function disable()
@@ -228,18 +241,31 @@ local function status(state)
 end
 
 function OnFrame()
+    if not CamStructure and not findCamStructure() then
+        if active then
+            disable()
+        end
+        SCRIPT_RESULT = 'Waiting for camera...'
+        return true
+    end
+
     if Keyboard.IsKeyPressed(cfg.toggle) then
         if active then
             disable()
             SCRIPT_RESULT = status('DISABLED')
         else
-            enable()
-            SCRIPT_RESULT = status('ENABLED')
+            if enable() then
+                SCRIPT_RESULT = status('ENABLED')
+            else
+                SCRIPT_RESULT = 'Camera not found'
+            end
         end
+        return true
     end
+
     if not active then
         SCRIPT_RESULT = status('DISABLED')
-        return
+        return true
     end
 
     local speed = cfg.moveSpeed
@@ -304,11 +330,15 @@ function OnFrame()
     writePosition()
     writeFov()
     SCRIPT_RESULT = status('ENABLED')
+    return true
 end
 
-CamStructure = ffi.cast('uint32_t*', base + 0xE374CC)[0]
-readOrientation()
-readPosition()
-fov = readFloat(CamStructure+0x670)
-SCRIPT_RESULT = status('loaded')
+if findCamStructure() then
+    readOrientation()
+    readPosition()
+    fov = readFloat(CamStructure+0x670)
+    SCRIPT_RESULT = status('loaded')
+else
+    SCRIPT_RESULT = 'Waiting for camera...'
+end
 
