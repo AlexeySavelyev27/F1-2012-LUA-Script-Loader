@@ -133,8 +133,9 @@ local function rotateAround(axis,angle)
 end
 
 local function readOrientation()
-    orient.right = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x640), readFloat(CamStructure+0x650) }
-    orient.up    = { readFloat(CamStructure+0x634), readFloat(CamStructure+0x644), readFloat(CamStructure+0x654) }
+    orient.up    = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x640), readFloat(CamStructure+0x650) }
+    orient.right = { readFloat(CamStructure+0x634), readFloat(CamStructure+0x644), readFloat(CamStructure+0x654) }
+
     orient.forward= { readFloat(CamStructure+0x638), readFloat(CamStructure+0x648), readFloat(CamStructure+0x658) }
 end
 local function readPosition()
@@ -142,9 +143,9 @@ local function readPosition()
 end
 local function writeOrientation()
     local vals = {
-        orient.right[1], orient.up[1], orient.forward[1],
-        orient.right[2], orient.up[2], orient.forward[2],
-        orient.right[3], orient.up[3], orient.forward[3]
+        orient.up[1], orient.right[1], orient.forward[1],
+        orient.up[2], orient.right[2], orient.forward[2],
+        orient.up[3], orient.right[3], orient.forward[3]
     }
     local o1 = {0x630,0x634,0x638,0x640,0x644,0x648,0x650,0x654,0x658}
     local o2 = {0x6A0,0x6A4,0x6A8,0x6B0,0x6B4,0x6B8,0x6C0,0x6C4,0x6C8}
@@ -218,14 +219,14 @@ function OnFrame()
         pos[3] = pos[3] - orient.forward[3]*speed
     end
     if Keyboard.IsKeyDown(cfg.left) then
-        pos[1] = pos[1] - orient.right[1]*speed
-        pos[2] = pos[2] - orient.right[2]*speed
-        pos[3] = pos[3] - orient.right[3]*speed
-    end
-    if Keyboard.IsKeyDown(cfg.right) then
         pos[1] = pos[1] + orient.right[1]*speed
         pos[2] = pos[2] + orient.right[2]*speed
         pos[3] = pos[3] + orient.right[3]*speed
+    end
+    if Keyboard.IsKeyDown(cfg.right) then
+        pos[1] = pos[1] - orient.right[1]*speed
+        pos[2] = pos[2] - orient.right[2]*speed
+        pos[3] = pos[3] - orient.right[3]*speed
     end
     if Keyboard.IsKeyDown(cfg.up) then
         pos[1] = pos[1] + orient.up[1]*speed
@@ -246,8 +247,8 @@ function OnFrame()
     end
 
     local dx, dy = mouseDelta()
-    if dx ~= 0 then rotateAround(orient.up, dx * cfg.mouseSens) end
-    if dy ~= 0 then rotateAround(orient.right, dy * cfg.mouseSens) end
+    if dx ~= 0 then rotateAround(orient.up, -dx * cfg.mouseSens) end
+    if dy ~= 0 then rotateAround(orient.right, -dy * cfg.mouseSens) end
 
     writeOrientation()
     writePosition()
