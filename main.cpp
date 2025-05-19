@@ -120,6 +120,7 @@ int currentWidth = 0;
 int currentHeight = 0;
 std::map<DWORD, BreakpointInfo> breakpointInfo;
 bool insideBreakpointHandler = false;
+PVOID vehHandle = nullptr;
 int lua_ProtectMemory(lua_State* L);
 
 
@@ -1332,6 +1333,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
         DisableThreadLibraryCalls(hinstDLL);
         // Set up exception handler before starting the main thread
         SetUnhandledExceptionFilter(BreakpointExceptionHandler);
+        vehHandle = AddVectoredExceptionHandler(1, BreakpointExceptionHandler);
         LoadConfig();
         CreateThread(nullptr, 0, MainThread, nullptr, 0, nullptr);
         break;
@@ -1377,6 +1379,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
 
         MH_DisableHook(MH_ALL_HOOKS);
         MH_Uninitialize();
+
+        if (vehHandle) {
+            RemoveVectoredExceptionHandler(vehHandle);
+            vehHandle = nullptr;
+        }
 
         if (logFile.is_open()) {
             Log("DLL detached - shutting down");
