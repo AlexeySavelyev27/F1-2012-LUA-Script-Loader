@@ -1,0 +1,53 @@
+﻿  pch.cpp
+  imgui_impl_dx10.cpp
+  imgui_impl_dx11.cpp
+  imgui_impl_dx12.cpp
+  imgui_impl_dx9.cpp
+  imgui_impl_win32.cpp
+  imgui.cpp
+  imgui_demo.cpp
+  imgui_draw.cpp
+  imgui_tables.cpp
+  imgui_widgets.cpp
+  main.cpp
+I:\SteamLibrary\steamapps\common\F1 2012\HOOK\dinput8\dinput8\main.cpp(338,36): warning C4244: 'argument': conversion from 'DWORD64' to 'lua_Integer', possible loss of data
+C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xutility(4689,18): warning C4244: '=': conversion from 'wchar_t' to 'char', possible loss of data
+  (compiling source file 'main.cpp')
+      C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xutility(4689,18):
+      the template instantiation context (the oldest one first) is
+          I:\SteamLibrary\steamapps\common\F1 2012\HOOK\dinput8\dinput8\main.cpp(864,37):
+          see reference to function template instantiation 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string<std::_String_iterator<std::_String_val<std::_Simple_types<_Elem>>>,0>(_Iter,_Iter,const _Alloc &)' being compiled
+          with
+          [
+              _Elem=wchar_t,
+              _Iter=std::_String_iterator<std::_String_val<std::_Simple_types<wchar_t>>>,
+              _Alloc=std::allocator<char>
+          ]
+              I:\SteamLibrary\steamapps\common\F1 2012\HOOK\dinput8\dinput8\main.cpp(864,37):
+              see the first reference to 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>::basic_string' in 'MonitorDirectoryChanges'
+          C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(793,17):
+          see reference to function template instantiation 'void std::basic_string<char,std::char_traits<char>,std::allocator<char>>::_Construct_from_iter<wchar_t*,wchar_t*,_Size_type>(_Iter,const _Sent,_Size)' being compiled
+          with
+          [
+              _Size_type=unsigned int,
+              _Iter=wchar_t *,
+              _Sent=wchar_t *,
+              _Size=unsigned int
+          ]
+          C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.41.34120\include\xstring(949,18):
+          see reference to function template instantiation '_OutIt *std::_Copy_n_unchecked4<wchar_t*,_Size,char*>(_InIt,_SizeTy,_OutIt)' being compiled
+          with
+          [
+              _OutIt=char *,
+              _Size=unsigned int,
+              _InIt=wchar_t *,
+              _SizeTy=unsigned int
+          ]
+  
+     Creating library I:\SteamLibrary\steamapps\common\F1 2012\HOOK\dinput8\Release\dinput8.lib and object I:\SteamLibrary\steamapps\common\F1 2012\HOOK\dinput8\Release\dinput8.exp
+  Previous IPDB not found, fall back to full compilation.
+LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
+  Generating code
+  All 3092 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  dinput8.vcxproj -> I:\SteamLibrary\steamapps\common\F1 2012\HOOK\dinput8\Release\dinput8.dll
