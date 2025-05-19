@@ -41,6 +41,7 @@ end
 local iniPath = debug.getinfo(1, 'S').source:match('@(.+)[/\\]') .. '/free_cam.ini'
 local controls = parseIni(iniPath)
 
+
 local toggleName = controls.FreeCamToggle or 'VK_F1'
 local cfg = {
     toggle = keyCode(toggleName),
@@ -134,6 +135,7 @@ local function rotateAround(axis,angle)
 end
 
 local function readOrientation()
+
     orient.up     = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x634), readFloat(CamStructure+0x638) }
     orient.right  = { readFloat(CamStructure+0x640), readFloat(CamStructure+0x644), readFloat(CamStructure+0x648) }
     orient.forward= { readFloat(CamStructure+0x650), readFloat(CamStructure+0x654), readFloat(CamStructure+0x658) }
@@ -209,7 +211,7 @@ end
 local function status(state)
     local pitch,yaw,roll = toEuler()
     return string.format(
-        "Plugin Status: FreeCam %s. Press %s to toggle.\nCurrent coordinates: x=%.2f, y=%.2f, z=%.2f\nCurrent oriantation: pitch=%.2f, yaw=%.2f, roll=%.2f",
+        "FreeCam %s. Press %s to toggle.\nCurrent coordinates: x = %.2f, y = %.2f, z = %.2f\nCurrent oriantation: pitch = %.2f, yaw = %.2f, roll = %.2f",
         state, toggleName, pos[1], pos[2], pos[3], pitch, yaw, roll)
 end
 
