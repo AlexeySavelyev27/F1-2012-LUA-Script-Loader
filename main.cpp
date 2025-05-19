@@ -1357,6 +1357,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
             monitorThread.join();
         }
 
+        if (hwnd && oWndProc) {
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
+            oWndProc = nullptr;
+            hwnd = nullptr;
+        }
+
         // Remove all breakpoints on exit
         for (auto& pair : breakpointInfo) {
             DWORD address = pair.first;
