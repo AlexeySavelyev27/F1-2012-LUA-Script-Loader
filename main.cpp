@@ -371,6 +371,14 @@ int lua_AllocateMemory(lua_State* L) {
     return 1;
 }
 
+// Frees memory previously allocated with AllocateMemory
+int lua_FreeMemory(lua_State* L) {
+    void* memory = (void*)luaL_checkinteger(L, 1);
+    BOOL result = VirtualFree(memory, 0, MEM_RELEASE);
+    lua_pushboolean(L, result);
+    return 1;
+}
+
 int lua_GetModuleBase(lua_State* L) {
     const char* moduleName = luaL_checkstring(L, 1);
     HMODULE hModule = GetModuleHandleA(moduleName);
@@ -619,6 +627,11 @@ void SetupLuaKeyboardAPI() {
 
     lua_pushstring(L, "AllocateMemory");
     lua_pushcfunction(L, lua_AllocateMemory);
+    lua_settable(L, -3);
+
+    // FreeMemory
+    lua_pushstring(L, "FreeMemory");
+    lua_pushcfunction(L, lua_FreeMemory);
     lua_settable(L, -3);
 
     lua_pushstring(L, "ProtectMemory");
