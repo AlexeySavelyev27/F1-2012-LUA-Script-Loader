@@ -1231,7 +1231,9 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
     int closeKey = GetVirtualKeyFromName(config.closeKey);
     int reloadKey = GetVirtualKeyFromName(config.reloadKey);
 
-    if ((GetAsyncKeyState(toggleKey) & 1)) {
+    bool isActive = (GetForegroundWindow() == hwnd);
+
+    if (isActive && (GetAsyncKeyState(toggleKey) & 1)) {
         if (!overlayVisible) {
             overlayVisible = true;
             Log("Overlay shown (" + config.toggleKey + ")");
@@ -1242,19 +1244,19 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
         }
     }
 
-    if ((GetAsyncKeyState(reloadKey) & 1) && overlayVisible && !plugins.empty()) {
+    if (isActive && (GetAsyncKeyState(reloadKey) & 1) && overlayVisible && !plugins.empty()) {
         auto& plugin = plugins[currentPlugin];
         plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
         plugin.status = plugin.executionResult;
         Log("Manually re-executed current plugin: " + plugin.name + " using key " + config.reloadKey);
     }
 
-    if (GetAsyncKeyState(closeKey) & 1) {
+    if (isActive && (GetAsyncKeyState(closeKey) & 1)) {
         overlayVisible = false;
         Log("Overlay hidden (" + config.closeKey + ")");
     }
 
-    if (initialized) {
+    if (initialized && isActive) {
         if (overlayVisible) {
             // Make sure the current plugin status is set
             if (!plugins.empty() && (plugins[currentPlugin].executionResult.empty() ||
