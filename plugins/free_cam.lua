@@ -84,23 +84,20 @@ end
 
 local base = Memory.GetModuleBase('F1_2012.exe')
 local CamStructure
-local CamMatrix
 
 local function findCamStructure()
-    local ptr1 = Memory.ReadMemory(base + 0xE374CC, 4)
-    local ptr2 = Memory.ReadMemory(base + 0x7B4CFC, 4)
-    if ptr1 and ptr1 ~= 0 and ptr2 and ptr2 ~= 0 then
-        CamStructure = ptr1
-        CamMatrix = ptr2
+    local ptr = Memory.ReadMemory(base + 0xE374CC, 4)
+    if ptr and ptr ~= 0 then
+        CamStructure = ptr
         return true
     end
     CamStructure = nil
-    CamMatrix = nil
     return false
 end
 
-local patchOffsets = {0x45F4ED,0x45F4F5,0x45F4FD,0x45F505}
-local patchSize    = {4,4,4,4}
+local renderOffsets = {0x26C0B7,0x26C0C5,0x26C0D3,0x26C0E1,0x26C0F0,0x26C100,0x26C110,0x26C120,0x26C130,0x26C140,0x26C150,0x26C15D}
+local camOffsets    = {0x26C16A,0x26C178,0x26C186,0x26C194,0x26C1A3,0x26C1B3,0x26C1C3,0x26C1D3,0x26C1E3,0x26C1F3,0x26C203,0x26C211}
+local patchSize     = {7,7,7,7,8,8,8,8,8,8,8,6}
 local savedBytes = {}
 local active = false
 
@@ -175,13 +172,13 @@ local function updateOrientation()
 end
 
 local function readOrientation()
-    orient.up      = { readFloat(CamMatrix+0x10), readFloat(CamMatrix+0x14), readFloat(CamMatrix+0x18) }
-    orient.right   = { readFloat(CamMatrix+0x20), readFloat(CamMatrix+0x24), readFloat(CamMatrix+0x28) }
-    orient.forward = { readFloat(CamMatrix+0x30), readFloat(CamMatrix+0x34), readFloat(CamMatrix+0x38) }
+    orient.up     = { readFloat(CamStructure+0x630), readFloat(CamStructure+0x634), readFloat(CamStructure+0x638) }
+    orient.right  = { readFloat(CamStructure+0x640), readFloat(CamStructure+0x644), readFloat(CamStructure+0x648) }
+    orient.forward= { readFloat(CamStructure+0x650), readFloat(CamStructure+0x654), readFloat(CamStructure+0x658) }
 end
 
 local function readPosition()
-    pos = { readFloat(CamMatrix+0x40), readFloat(CamMatrix+0x44), readFloat(CamMatrix+0x48) }
+    pos = { readFloat(CamStructure+0x660), readFloat(CamStructure+0x664), readFloat(CamStructure+0x668) }
 end
 local function writeOrientation()
     local vals = {
@@ -189,15 +186,19 @@ local function writeOrientation()
         orient.right[1], orient.right[2], orient.right[3],
         orient.forward[1], orient.forward[2], orient.forward[3]
     }
-    local offs = {0x10,0x14,0x18,0x20,0x24,0x28,0x30,0x34,0x38}
+    local o1 = {0x630,0x634,0x638,0x640,0x644,0x648,0x650,0x654,0x658}
+    local o2 = {0x6A0,0x6A4,0x6A8,0x6B0,0x6B4,0x6B8,0x6C0,0x6C4,0x6C8}
     for i=1,9 do
-        writeFloat(CamMatrix+offs[i], vals[i])
+        writeFloat(CamStructure+o1[i], vals[i])
+        writeFloat(CamStructure+o2[i], vals[i])
     end
 end
 local function writePosition()
-    local offs = {0x40,0x44,0x48}
+    local offs1 = {0x660,0x664,0x668}
+    local offs2 = {0x6D0,0x6D4,0x6D8}
     for i=1,3 do
-        writeFloat(CamMatrix+offs[i], pos[i])
+        writeFloat(CamStructure+offs1[i], pos[i])
+        writeFloat(CamStructure+offs2[i], pos[i])
     end
 end
 local function writeFov()
@@ -232,7 +233,8 @@ local function enable()
     if not findCamStructure() then
         return false
     end
-    patch(patchOffsets)
+    patch(renderOffsets)
+    patch(camOffsets)
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
@@ -267,7 +269,7 @@ local function status(state)
 end
 
 function OnFrame()
-    if (not CamStructure or not CamMatrix) and not findCamStructure() then
+    if not CamStructure and not findCamStructure() then
         if active then
             disable()
         end
