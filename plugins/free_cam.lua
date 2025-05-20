@@ -96,7 +96,7 @@ local camOffsets    = {0x26C16A,0x26C178,0x26C186,0x26C194,0x26C1A3,0x26C1B3,0x2
 local patchSize     = {7,7,7,7,8,8,8,8,8,8,8,6}
 local savedBytes = {}
 local active = false
-local pluginStatus = ''
+local pluginStatus = ""
 
 local function patch(addrs)
     for i,off in ipairs(addrs) do
@@ -229,7 +229,7 @@ local function disable()
     active = false
 end
 
-local function toEuler()
+function toEuler()
     local pitch = math.deg(math.asin(-orient.forward[2]))
     local yaw = math.deg(math.atan2(orient.forward[1], orient.forward[3]))
     local roll = math.deg(math.atan2(orient.up[1], orient.up[2]))
@@ -257,21 +257,20 @@ function OnFrame()
         if active then
             disable()
             pluginStatus = status('DISABLED')
+            SCRIPT_RESULT = pluginStatus
         else
             if enable() then
                 pluginStatus = status('ENABLED')
+                SCRIPT_RESULT = pluginStatus
             else
                 pluginStatus = 'Camera not found'
+                SCRIPT_RESULT = pluginStatus
             end
         end
-        SCRIPT_RESULT = pluginStatus
         return true
     end
 
     if not active then
-        readOrientation()
-        readPosition()
-        fov = readFloat(CamStructure+0x670)
         pluginStatus = status('DISABLED')
         SCRIPT_RESULT = pluginStatus
         return true
@@ -352,7 +351,6 @@ if findCamStructure() then
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
-    rollAngle = math.rad(select(3, toEuler()))
     pluginStatus = status('loaded')
     SCRIPT_RESULT = pluginStatus
 else
