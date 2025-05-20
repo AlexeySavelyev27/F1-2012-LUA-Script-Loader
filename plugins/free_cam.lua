@@ -240,16 +240,9 @@ local function enable()
     pitch = math.rad(p)
     yaw = math.rad(y)
     roll = math.rad(r)
-<<<<<<< HEAD
-    local pt = ffi.new('POINT[1]')
-    user32.GetCursorPos(pt)
-    prevMouse.x = pt[0].x
-    prevMouse.y = pt[0].y
-=======
     screenCenter.x = user32.GetSystemMetrics(0) / 2
     screenCenter.y = user32.GetSystemMetrics(1) / 2
     user32.SetCursorPos(screenCenter.x, screenCenter.y)
->>>>>>> c8aeb5a6f7d62fa944b91454975b0531a8ad4068
     active = true
     return true
 end
@@ -339,17 +332,18 @@ function OnFrame()
 
     if Keyboard.IsKeyDown(cfg.up) then
         pos[1] = pos[1] + orient.up[1]*speed
-        pos[2] = pos[2] + orient.up[2]*speed
+		pos[2] = pos[2] + orient.up[2]*speed
         pos[3] = pos[3] + orient.up[3]*speed
     end
-
+ 
     if Keyboard.IsKeyDown(cfg.down) then
         pos[1] = pos[1] - orient.up[1]*speed
         pos[2] = pos[2] - orient.up[2]*speed
         pos[3] = pos[3] - orient.up[3]*speed
     end
-
+ 
     local fovSpeed = speed * 0.1
+ 
     if Keyboard.IsKeyDown(cfg.fovUp) then
         fov = fov + fovSpeed
     elseif Keyboard.IsKeyDown(cfg.fovDown) then
@@ -362,24 +356,28 @@ function OnFrame()
     elseif Keyboard.IsKeyDown(cfg.rollRight) then
         roll = roll + rollSpeed
     end
-
+ 
     local dx, dy = 0, 0
-    if isKeyDown(VK_LBUTTON) then
-        dx, dy = mouseDelta()
+    local lmbDown = isKeyDown(VK_LBUTTON)
+    if lmbDown then
+        if not lmbHeld then
+            user32.SetCursorPos(screenCenter.x, screenCenter.y)
+            dx, dy = 0, 0
+        else
+            dx, dy = mouseDelta()
+        end
     end
+	lmbHeld = lmbDown
     local lookSpeed = cfg.mouseSens * 0.5
     if isKeyDown(VK_RBUTTON) then
         lookSpeed = lookSpeed * 2
     end
+    if isKeyDown(VK_MBUTTON) then
+        lookSpeed = lookSpeed / 10
+    end
     if dx ~= 0 then yaw = yaw - dx * lookSpeed end
     if dy ~= 0 then pitch = pitch + dy * lookSpeed end
 
-<<<<<<< HEAD
-    if dx ~= 0 then yaw = yaw - dx * cfg.mouseSens * speedMod end
-    if dy ~= 0 then pitch = pitch + dy * cfg.mouseSens * speedMod end
-
-=======
->>>>>>> c8aeb5a6f7d62fa944b91454975b0531a8ad4068
     if pitch > math.pi/2 - 0.001 then pitch = math.pi/2 - 0.001 end
     if pitch < -math.pi/2 + 0.001 then pitch = -math.pi/2 + 0.001 end
 
