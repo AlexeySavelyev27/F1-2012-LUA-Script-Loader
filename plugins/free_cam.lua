@@ -127,6 +127,7 @@ local orient = {
 }
 local pos = {0,0,0}
 local fov = 0
+local yaw, pitch, roll = 0, 0, 0
 
 local function vecDot(a,b)
     return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]
@@ -150,10 +151,20 @@ local function rotateVec(v,axis,angle)
         v[3]*c + cross[3]*s + axis[3]*d*(1-c)
     }
 end
-local function rotateAround(axis,angle)
-    orient.right = vecNorm(rotateVec(orient.right,axis,angle))
-    orient.up = vecNorm(rotateVec(orient.up,axis,angle))
-    orient.forward = vecNorm(rotateVec(orient.forward,axis,angle))
+local function updateOrientation()
+    local sy, cy = math.sin(yaw), math.cos(yaw)
+    local sp, cp = math.sin(pitch), math.cos(pitch)
+
+    orient.forward = { sy*cp, -sp, cy*cp }
+
+    local world_up = {0,1,0}
+    orient.right = vecNorm(vecCross(world_up, orient.forward))
+    orient.up = vecNorm(vecCross(orient.forward, orient.right))
+
+    if roll ~= 0 then
+        orient.right = vecNorm(rotateVec(orient.right, orient.forward, roll))
+        orient.up = vecNorm(rotateVec(orient.up, orient.forward, roll))
+    end
 end
 
 local function readOrientation()
@@ -213,6 +224,10 @@ local function enable()
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
+    local p,y,r = toEuler()
+    pitch = math.rad(p)
+    yaw = math.rad(y)
+    roll = math.rad(r)
     local pt = ffi.new('POINT[1]')
     user32.GetCursorPos(pt)
     prevMouse.x = pt[0].x
@@ -264,13 +279,21 @@ function OnFrame()
     end
 
     if not active then
+        readOrientation()
+        readPosition()
+        fov = readFloat(CamStructure+0x670)
+        local p,y,r = toEuler()
+        pitch = math.rad(p)
+        yaw = math.rad(y)
+        roll = math.rad(r)
         SCRIPT_RESULT = status('DISABLED')
         return true
     end
 
-    local speed = cfg.moveSpeed
-    if Keyboard.IsKeyDown(cfg.speedUp) then speed = speed * 10 end
-    if Keyboard.IsKeyDown(cfg.slowDown) then speed = speed / 10 end
+    local speedMod = 1
+    if Keyboard.IsKeyDown(cfg.speedUp) then speedMod = speedMod * 10 end
+    if Keyboard.IsKeyDown(cfg.slowDown) then speedMod = speedMod / 10 end
+    local speed = cfg.moveSpeed * speedMod
 
     if Keyboard.IsKeyDown(cfg.forward) then
         pos[1] = pos[1] + orient.forward[1]*speed
@@ -314,17 +337,22 @@ function OnFrame()
         fov = fov - speed
     end
 
-    local rollSpeed = 0.01
+    local rollSpeed = 0.01 * speedMod
     if Keyboard.IsKeyDown(cfg.rollLeft) then
-        rotateAround(orient.forward, -rollSpeed)
+        roll = roll - rollSpeed
     elseif Keyboard.IsKeyDown(cfg.rollRight) then
-        rotateAround(orient.forward, rollSpeed)
+        roll = roll + rollSpeed
     end
 
     local dx, dy = mouseDelta()
 
-    if dx ~= 0 then rotateAround(orient.up, dx * cfg.mouseSens) end
-    if dy ~= 0 then rotateAround(orient.right, dy * cfg.mouseSens) end
+    if dx ~= 0 then yaw = yaw - dx * cfg.mouseSens * speedMod end
+    if dy ~= 0 then pitch = pitch + dy * cfg.mouseSens * speedMod end
+
+    if pitch > math.pi/2 - 0.001 then pitch = math.pi/2 - 0.001 end
+    if pitch < -math.pi/2 + 0.001 then pitch = -math.pi/2 + 0.001 end
+
+    updateOrientation()
 
     writeOrientation()
     writePosition()
@@ -337,6 +365,10 @@ if findCamStructure() then
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
+    local p,y,r = toEuler()
+    pitch = math.rad(p)
+    yaw = math.rad(y)
+    roll = math.rad(r)
     SCRIPT_RESULT = status('loaded')
 else
     SCRIPT_RESULT = 'Waiting for camera...'

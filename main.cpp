@@ -1113,7 +1113,7 @@ void RenderOverlay() {
 
 // --- Plugin OnFrame Execution ---
 void CallPluginOnFrame() {
-    if (plugins.empty() || !overlayVisible) return;
+    if (plugins.empty()) return;
 
     // Get the currently selected plugin
     auto& plugin = plugins[currentPlugin];
@@ -1254,11 +1254,13 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
         Log("Overlay hidden (" + config.closeKey + ")");
     }
 
-    if (initialized && overlayVisible) {
-        // Make sure the current plugin status is set
-        if (!plugins.empty() && (plugins[currentPlugin].executionResult.empty() ||
-            plugins[currentPlugin].executionResult == "Pending execution")) {
-            RefreshCurrentPluginStatus();
+    if (initialized) {
+        if (overlayVisible) {
+            // Make sure the current plugin status is set
+            if (!plugins.empty() && (plugins[currentPlugin].executionResult.empty() ||
+                plugins[currentPlugin].executionResult == "Pending execution")) {
+                RefreshCurrentPluginStatus();
+            }
         }
 
         CallPluginOnFrame();

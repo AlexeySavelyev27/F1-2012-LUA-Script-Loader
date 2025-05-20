@@ -1,0 +1,131 @@
+diff --git a/plugins/free_cam.lua b/plugins/free_cam.lua
+index eb31271..638b9cd 100644
+--- a/plugins/free_cam.lua
++++ b/plugins/free_cam.lua
+@@ -187,50 +187,52 @@ local function writeOrientation()
+         orient.forward[1], orient.forward[2], orient.forward[3]
+     }
+     local o1 = {0x630,0x634,0x638,0x640,0x644,0x648,0x650,0x654,0x658}
+     local o2 = {0x6A0,0x6A4,0x6A8,0x6B0,0x6B4,0x6B8,0x6C0,0x6C4,0x6C8}
+     for i=1,9 do
+         writeFloat(CamStructure+o1[i], vals[i])
+         writeFloat(CamStructure+o2[i], vals[i])
+     end
+ end
+ local function writePosition()
+     local offs1 = {0x660,0x664,0x668}
+     local offs2 = {0x6D0,0x6D4,0x6D8}
+     for i=1,3 do
+         writeFloat(CamStructure+offs1[i], pos[i])
+         writeFloat(CamStructure+offs2[i], pos[i])
+     end
+ end
+ local function writeFov()
+     writeFloat(CamStructure+0x670, fov)
+     writeFloat(CamStructure+0x6E0, fov)
+ end
+ 
+ local screenCenter = {x=0, y=0}
+ local VK_LBUTTON = 0x01
+ local VK_RBUTTON = 0x02
++local VK_MBUTTON = 0x04
++local lmbHeld = false
+ 
+ local function isKeyDown(vk)
+     return bit.band(user32.GetAsyncKeyState(vk), 0x8000) ~= 0
+ end
+ 
+ -- Forward declaration for toEuler
+ local toEuler
+ local function mouseDelta()
+     local pt = ffi.new('POINT[1]')
+     if user32.GetCursorPos(pt) then
+         local dx = pt[0].x - screenCenter.x
+         local dy = pt[0].y - screenCenter.y
+         user32.SetCursorPos(screenCenter.x, screenCenter.y)
+         return dx, dy
+     end
+     return 0,0
+ end
+ 
+ local function enable()
+     if not findCamStructure() then
+         return false
+     end
+     patch(renderOffsets)
+     patch(camOffsets)
+     readOrientation()
+diff --git a/plugins/free_cam.lua b/plugins/free_cam.lua
+index eb31271..638b9cd 100644
+--- a/plugins/free_cam.lua
++++ b/plugins/free_cam.lua
+@@ -335,57 +337,67 @@ function OnFrame()
+         pos[2] = pos[2] + orient.up[2]*speed
+         pos[3] = pos[3] + orient.up[3]*speed
+     end
+ 
+     if Keyboard.IsKeyDown(cfg.down) then
+         pos[1] = pos[1] - orient.up[1]*speed
+         pos[2] = pos[2] - orient.up[2]*speed
+         pos[3] = pos[3] - orient.up[3]*speed
+     end
+ 
+     local fovSpeed = speed * 0.1
+     if Keyboard.IsKeyDown(cfg.fovUp) then
+         fov = fov + fovSpeed
+     elseif Keyboard.IsKeyDown(cfg.fovDown) then
+         fov = fov - fovSpeed
+     end
+ 
+     local rollSpeed = 0.01 * speedMod
+     if Keyboard.IsKeyDown(cfg.rollLeft) then
+         roll = roll - rollSpeed
+     elseif Keyboard.IsKeyDown(cfg.rollRight) then
+         roll = roll + rollSpeed
+     end
+ 
+     local dx, dy = 0, 0
+-    if isKeyDown(VK_LBUTTON) then
+-        dx, dy = mouseDelta()
++    local lmbDown = isKeyDown(VK_LBUTTON)
++    if lmbDown then
++        if not lmbHeld then
++            user32.SetCursorPos(screenCenter.x, screenCenter.y)
++            dx, dy = 0, 0
++        else
++            dx, dy = mouseDelta()
++        end
+     end
++    lmbHeld = lmbDown
+     local lookSpeed = cfg.mouseSens * 0.5
+     if isKeyDown(VK_RBUTTON) then
+         lookSpeed = lookSpeed * 2
+     end
++    if isKeyDown(VK_MBUTTON) then
++        lookSpeed = lookSpeed / 10
++    end
+     if dx ~= 0 then yaw = yaw - dx * lookSpeed end
+     if dy ~= 0 then pitch = pitch + dy * lookSpeed end
+ 
+     if pitch > math.pi/2 - 0.001 then pitch = math.pi/2 - 0.001 end
+     if pitch < -math.pi/2 + 0.001 then pitch = -math.pi/2 + 0.001 end
+ 
+     updateOrientation()
+ 
+     writeOrientation()
+     writePosition()
+     writeFov()
+     SCRIPT_RESULT = status('ENABLED')
+     return true
+ end
+ 
+ if findCamStructure() then
+     readOrientation()
+     readPosition()
+     fov = readFloat(CamStructure+0x670)
+     local p,y,r = toEuler()
+     pitch = math.rad(p)
+     yaw = math.rad(y)
+     roll = math.rad(r)
+     SCRIPT_RESULT = status('loaded')
+ else
