@@ -77,6 +77,7 @@ struct BreakpointInfo {
     BYTE originalByte;
     std::string callbackName;
     bool active;
+    lua_State* L; // Lua state that owns this breakpoint
 };
 
 struct HookConfig {
@@ -98,6 +99,7 @@ struct Plugin {
     string luaPath;
     string executionResult;
     map<string, string> iniData;
+    lua_State* L = nullptr; // Dedicated Lua state for this plugin
 };
 
 // --- Globals ---
@@ -112,7 +114,6 @@ WNDPROC oWndProc = nullptr;
 Microsoft::WRL::ComPtr<ID3D11Device> device;
 Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 Microsoft::WRL::ComPtr<ID3D11RenderTargetView> mainRenderTargetView;
-lua_State* L = nullptr;
 std::atomic<bool> stopMonitoring{ false };
 std::unordered_map<std::string, Plugin> loadedPlugins;
 std::thread monitorThread;
@@ -137,9 +138,9 @@ void MonitorDirectoryChanges(const std::string& directory);
 void InitHook();
 void RenderOverlay();
 void CallPluginOnFrame();
-string ExecuteLuaScript(const string& scriptPath);
+string ExecuteLuaScript(const string& scriptPath, lua_State* L);
 int GetVirtualKeyFromName(const string& keyName);
-void SetupLuaKeyboardAPI();
+void SetupLuaKeyboardAPI(lua_State* L);
 void RefreshCurrentPluginStatus();
 
 // --- Logging ---
@@ -247,7 +248,7 @@ int GetVirtualKeyFromName(const string& keyName) {
 }
 
 // --- Lua Script Execution ---
-string ExecuteLuaScript(const string& scriptPath) {
+string ExecuteLuaScript(const string& scriptPath, lua_State* L) {
     if (!L) return "Lua engine not initialized";
 
     int top = lua_gettop(L);
@@ -295,7 +296,7 @@ void RefreshCurrentPluginStatus() {
     if (plugins.empty()) return;
 
     auto& plugin = plugins[currentPlugin];
-    plugin.executionResult = ExecuteLuaScript(plugin.luaPath);
+    plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
     plugin.status = plugin.executionResult;
 
     // Update in loadedPlugins too
@@ -434,7 +435,7 @@ int lua_SetBreakpoint(lua_State* L) {
         if (WriteProcessMemory(GetCurrentProcess(), reinterpret_cast<LPVOID>(address),
             &int3, 1, nullptr)) {
             success = TRUE;
-            BreakpointInfo info = { origByte, callbackName, true };
+            BreakpointInfo info = { origByte, callbackName, true, L };
             breakpointInfo[address] = info;
             Log("Breakpoint set at 0x" + std::to_string(address) + " callback: " + callbackName);
         }
@@ -558,7 +559,7 @@ int lua_ProtectMemory(lua_State* L) {
 }
 
 // --- Lua API Setup ---
-void SetupLuaKeyboardAPI() {
+void SetupLuaKeyboardAPI(lua_State* L) {
     if (!L) return;
 
     // Keyboard API
@@ -721,6 +722,17 @@ void LoadPluginsWithoutExecution() {
         plugin.executionResult = "Pending execution";
         plugin.status = plugin.executionResult;
 
+        // Initialize Lua state for this plugin
+        plugin.L = luaL_newstate();
+        if (plugin.L) {
+            luaJIT_setmode(plugin.L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_ON);
+            luaL_openlibs(plugin.L);
+            luaL_dostring(plugin.L, "require('ffi')");
+            SetupLuaKeyboardAPI(plugin.L);
+        } else {
+            Log("Failed to create Lua state for plugin: " + plugin.name);
+        }
+
         Log("Parsing plugin: " + entry.path().string());
         Log("Name: " + plugin.name + " | Version: " + plugin.version + " | Author: " + plugin.author);
 
@@ -742,7 +754,7 @@ void ExecuteAllPlugins() {
                 std::to_string(plugins.size()) + ": " + plugin.name);
 
             // Execute the plugin and capture its result
-            std::string result = ExecuteLuaScript(plugin.luaPath);
+            std::string result = ExecuteLuaScript(plugin.luaPath, plugin.L);
 
             // Make sure we have a meaningful result
             if (result.empty()) {
@@ -799,6 +811,9 @@ void UpdateSinglePlugin(const std::string& baseName) {
         GetFileAttributesA(luaPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
         if (map_contains(loadedPlugins, baseName)) {
             Log("Plugin removed: " + baseName);
+            if (loadedPlugins[baseName].L) {
+                lua_close(loadedPlugins[baseName].L);
+            }
             loadedPlugins.erase(baseName);
             lastPluginState.erase(baseName);
         }
@@ -813,6 +828,20 @@ void UpdateSinglePlugin(const std::string& baseName) {
     plugin.statusInfo = map_contains(ini, "status.info") ? ini["status.info"] : "";
     plugin.luaPath = luaPath;
     plugin.iniData = ini;
+
+    // (Re)create Lua state for this plugin
+    if (plugin.L) {
+        lua_close(plugin.L);
+    }
+    plugin.L = luaL_newstate();
+    if (plugin.L) {
+        luaJIT_setmode(plugin.L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_ON);
+        luaL_openlibs(plugin.L);
+        luaL_dostring(plugin.L, "require('ffi')");
+        SetupLuaKeyboardAPI(plugin.L);
+    } else {
+        Log("Failed to create Lua state for plugin: " + plugin.name);
+    }
 
     // Check if plugin has changed
     bool isChanged = true;
@@ -832,7 +861,7 @@ void UpdateSinglePlugin(const std::string& baseName) {
 
     try {
         Log("Executing updated plugin: " + plugin.name);
-        plugin.executionResult = ExecuteLuaScript(plugin.luaPath);
+        plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
         plugin.status = plugin.executionResult;
     }
     catch (const std::exception& e) {
@@ -928,20 +957,21 @@ LONG CALLBACK BreakpointExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo) {
 
             Log("Breakpoint hit at 0x" + std::to_string(exceptionAddress));
 
-            // Call Lua callback
-            if (L) {
+            // Call Lua callback using the plugin's Lua state
+            lua_State* cbState = breakpointInfo[exceptionAddress].L;
+            if (cbState) {
                 std::string callbackName = breakpointInfo[exceptionAddress].callbackName;
-                lua_getglobal(L, callbackName.c_str());
-                if (lua_isfunction(L, -1)) {
-                    lua_pushinteger(L, exceptionAddress);
-                    if (lua_pcall(L, 1, 0, 0) != 0) {
-                        std::string error = lua_tostring(L, -1);
+                lua_getglobal(cbState, callbackName.c_str());
+                if (lua_isfunction(cbState, -1)) {
+                    lua_pushinteger(cbState, exceptionAddress);
+                    if (lua_pcall(cbState, 1, 0, 0) != 0) {
+                        std::string error = lua_tostring(cbState, -1);
                         Log("Error in breakpoint callback: " + error);
-                        lua_pop(L, 1);
+                        lua_pop(cbState, 1);
                     }
                 }
                 else {
-                    lua_pop(L, 1); // Pop non-function
+                    lua_pop(cbState, 1); // Pop non-function
                     Log("Breakpoint callback function not found: " + callbackName);
                 }
             }
@@ -1011,7 +1041,7 @@ void RenderOverlay() {
         // We'll check if the status seems empty
         if (p.executionResult.empty() || p.executionResult == "Pending execution") {
             Log("First-time display: Refreshing plugin status for " + p.name);
-            p.executionResult = ExecuteLuaScript(p.luaPath);
+            p.executionResult = ExecuteLuaScript(p.luaPath, p.L);
             p.status = p.executionResult;
 
             // Update loadedPlugins map too
@@ -1087,21 +1117,22 @@ void CallPluginOnFrame() {
 
     // Get the currently selected plugin
     auto& plugin = plugins[currentPlugin];
-    if (!L) return;
+    lua_State* state = plugin.L;
+    if (!state) return;
 
-    int top = lua_gettop(L);
-    lua_getglobal(L, "OnFrame");
+    int top = lua_gettop(state);
+    lua_getglobal(state, "OnFrame");
 
-    if (lua_isfunction(L, -1)) {
-        if (lua_pcall(L, 0, 1, 0) != 0) {
-            std::string error = lua_tostring(L, -1);
+    if (lua_isfunction(state, -1)) {
+        if (lua_pcall(state, 0, 1, 0) != 0) {
+            std::string error = lua_tostring(state, -1);
             Log("Error in OnFrame: " + error);
         }
         else {
-            if (lua_isboolean(L, -1) && lua_toboolean(L, -1)) {
-                lua_getglobal(L, "SCRIPT_RESULT");
-                if (lua_isstring(L, -1)) {
-                    std::string newResult = lua_tostring(L, -1);
+            if (lua_isboolean(state, -1) && lua_toboolean(state, -1)) {
+                lua_getglobal(state, "SCRIPT_RESULT");
+                if (lua_isstring(state, -1)) {
+                    std::string newResult = lua_tostring(state, -1);
 
                     // Update status only for the currently selected plugin
                     if (newResult != plugin.executionResult) {
@@ -1118,11 +1149,11 @@ void CallPluginOnFrame() {
                         }
                     }
                 }
-                lua_pop(L, 1);
+                lua_pop(state, 1);
             }
         }
     }
-    lua_settop(L, top);
+    lua_settop(state, top);
 }
 
 // --- DirectX Hook ---
@@ -1213,7 +1244,7 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
 
     if ((GetAsyncKeyState(reloadKey) & 1) && overlayVisible && !plugins.empty()) {
         auto& plugin = plugins[currentPlugin];
-        plugin.executionResult = ExecuteLuaScript(plugin.luaPath);
+        plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
         plugin.status = plugin.executionResult;
         Log("Manually re-executed current plugin: " + plugin.name + " using key " + config.reloadKey);
     }
@@ -1293,22 +1324,6 @@ void InitHook() {
 DWORD WINAPI MainThread(LPVOID) {
     Log("Main thread started");
 
-    // Initialize Lua first
-    L = luaL_newstate();
-    luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_ON);
-    if (!L) {
-        Log("CRITICAL: Failed to initialize Lua!");
-        return 1;
-    }
-    luaL_openlibs(L);
-    luaL_dostring(L, "require('ffi')");
-    SetupLuaKeyboardAPI();
-    Log("Lua engine initialized successfully");
-
-    lua_getglobal(L, "_VERSION");
-    const char* version = lua_tostring(L, -1);
-    Log(std::string("Lua version: ") + version);  // Должно быть "LuaJIT 2.1.x"
-
     // Load plugins without execution
     LoadPluginsWithoutExecution();
 
@@ -1375,9 +1390,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
         }
         breakpointInfo.clear();
 
-        if (L) {
-            lua_close(L);
-            L = nullptr;
+        // Close all plugin Lua states
+        for (auto& p : loadedPlugins) {
+            if (p.second.L) {
+                lua_close(p.second.L);
+                p.second.L = nullptr;
+            }
         }
 
         if (mainRenderTargetView) {
