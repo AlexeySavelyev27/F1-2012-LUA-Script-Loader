@@ -81,11 +81,22 @@ end
 local base = Memory.GetModuleBase('F1_2012.exe')
 local CamStructure
 
+local function findCamStructure()
+    local ptr = Memory.ReadMemory(base + 0xE374CC, 4)
+    if ptr and ptr ~= 0 then
+        CamStructure = ptr
+        return true
+    end
+    CamStructure = nil
+    return false
+end
+
 local renderOffsets = {0x26C0B7,0x26C0C5,0x26C0D3,0x26C0E1,0x26C0F0,0x26C100,0x26C110,0x26C120,0x26C130,0x26C140,0x26C150,0x26C15D}
 local camOffsets    = {0x26C16A,0x26C178,0x26C186,0x26C194,0x26C1A3,0x26C1B3,0x26C1C3,0x26C1D3,0x26C1E3,0x26C1F3,0x26C203,0x26C211}
 local patchSize     = {7,7,7,7,8,8,8,8,8,8,8,6}
 local savedBytes = {}
 local active = false
+local pluginStatus = ""
 
 local function patch(addrs)
     for i,off in ipairs(addrs) do
@@ -195,9 +206,11 @@ local function mouseDelta()
 end
 
 local function enable()
+    if not findCamStructure() then
+        return false
+    end
     patch(renderOffsets)
     patch(camOffsets)
-    CamStructure = ffi.cast('uint32_t*', base + 0xE374CC)[0]
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
@@ -206,6 +219,7 @@ local function enable()
     prevMouse.x = pt[0].x
     prevMouse.y = pt[0].y
     active = true
+    return true
 end
 
 local function disable()
@@ -213,7 +227,7 @@ local function disable()
     active = false
 end
 
-local function toEuler()
+function toEuler()
     local pitch = math.deg(math.asin(-orient.forward[2]))
     local yaw = math.deg(math.atan2(orient.forward[1], orient.forward[3]))
     local roll = math.deg(math.atan2(orient.up[1], orient.up[2]))
@@ -228,18 +242,36 @@ local function status(state)
 end
 
 function OnFrame()
+    if not CamStructure and not findCamStructure() then
+        if active then
+            disable()
+        end
+        pluginStatus = 'Waiting for camera...'
+        SCRIPT_RESULT = pluginStatus
+        return true
+    end
+
     if Keyboard.IsKeyPressed(cfg.toggle) then
         if active then
             disable()
-            SCRIPT_RESULT = status('DISABLED')
+            pluginStatus = status('DISABLED')
+            SCRIPT_RESULT = pluginStatus
         else
-            enable()
-            SCRIPT_RESULT = status('ENABLED')
+            if enable() then
+                pluginStatus = status('ENABLED')
+                SCRIPT_RESULT = pluginStatus
+            else
+                pluginStatus = 'Camera not found'
+                SCRIPT_RESULT = pluginStatus
+            end
         end
+        return true
     end
+
     if not active then
-        SCRIPT_RESULT = status('DISABLED')
-        return
+        pluginStatus = status('DISABLED')
+        SCRIPT_RESULT = pluginStatus
+        return true
     end
 
     local speed = cfg.moveSpeed
@@ -303,12 +335,19 @@ function OnFrame()
     writeOrientation()
     writePosition()
     writeFov()
-    SCRIPT_RESULT = status('ENABLED')
+    pluginStatus = status('ENABLED')
+    SCRIPT_RESULT = pluginStatus
+    return true
 end
 
-CamStructure = ffi.cast('uint32_t*', base + 0xE374CC)[0]
-readOrientation()
-readPosition()
-fov = readFloat(CamStructure+0x670)
-SCRIPT_RESULT = status('loaded')
+if findCamStructure() then
+    readOrientation()
+    readPosition()
+    fov = readFloat(CamStructure+0x670)
+    pluginStatus = status('loaded')
+    SCRIPT_RESULT = pluginStatus
+else
+    pluginStatus = 'Waiting for camera...'
+    SCRIPT_RESULT = pluginStatus
+end
 
