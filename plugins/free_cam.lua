@@ -128,6 +128,7 @@ local orient = {
 }
 local pos = {0,0,0}
 local fov = 0
+local rollAngle = 0
 
 local function vecDot(a,b)
     return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]
@@ -213,6 +214,7 @@ local function enable()
     patch(camOffsets)
     readOrientation()
     readPosition()
+    rollAngle = math.rad(select(3, toEuler()))
     fov = readFloat(CamStructure+0x670)
     local pt = ffi.new('POINT[1]')
     user32.GetCursorPos(pt)
@@ -323,14 +325,19 @@ function OnFrame()
     local rollSpeed = 0.01
     if Keyboard.IsKeyDown(cfg.rollLeft) then
         rotateAround(orient.forward, -rollSpeed)
+        rollAngle = rollAngle - rollSpeed
     elseif Keyboard.IsKeyDown(cfg.rollRight) then
         rotateAround(orient.forward, rollSpeed)
+        rollAngle = rollAngle + rollSpeed
     end
 
     local dx, dy = mouseDelta()
 
-    if dx ~= 0 then rotateAround(orient.up, dx * cfg.mouseSens) end
+    if dx ~= 0 then rotateAround(orient.up, -dx * cfg.mouseSens) end
     if dy ~= 0 then rotateAround(orient.right, dy * cfg.mouseSens) end
+
+    local _,_,cr = toEuler()
+    rotateAround(orient.forward, rollAngle - math.rad(cr))
 
     writeOrientation()
     writePosition()
