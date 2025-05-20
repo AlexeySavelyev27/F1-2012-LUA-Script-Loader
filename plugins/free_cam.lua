@@ -96,7 +96,6 @@ local camOffsets    = {0x26C16A,0x26C178,0x26C186,0x26C194,0x26C1A3,0x26C1B3,0x2
 local patchSize     = {7,7,7,7,8,8,8,8,8,8,8,6}
 local savedBytes = {}
 local active = false
-local pluginStatus = ""
 
 local function patch(addrs)
     for i,off in ipairs(addrs) do
@@ -128,7 +127,6 @@ local orient = {
 }
 local pos = {0,0,0}
 local fov = 0
-local rollAngle = 0
 
 local function vecDot(a,b)
     return a[1]*b[1]+a[2]*b[2]+a[3]*b[3]
@@ -214,7 +212,6 @@ local function enable()
     patch(camOffsets)
     readOrientation()
     readPosition()
-    rollAngle = math.rad(select(3, toEuler()))
     fov = readFloat(CamStructure+0x670)
     local pt = ffi.new('POINT[1]')
     user32.GetCursorPos(pt)
@@ -229,7 +226,7 @@ local function disable()
     active = false
 end
 
-function toEuler()
+local function toEuler()
     local pitch = math.deg(math.asin(-orient.forward[2]))
     local yaw = math.deg(math.atan2(orient.forward[1], orient.forward[3]))
     local roll = math.deg(math.atan2(orient.up[1], orient.up[2]))
@@ -248,31 +245,26 @@ function OnFrame()
         if active then
             disable()
         end
-        pluginStatus = 'Waiting for camera...'
-        SCRIPT_RESULT = pluginStatus
+        SCRIPT_RESULT = 'Waiting for camera...'
         return true
     end
 
     if Keyboard.IsKeyPressed(cfg.toggle) then
         if active then
             disable()
-            pluginStatus = status('DISABLED')
-            SCRIPT_RESULT = pluginStatus
+            SCRIPT_RESULT = status('DISABLED')
         else
             if enable() then
-                pluginStatus = status('ENABLED')
-                SCRIPT_RESULT = pluginStatus
+                SCRIPT_RESULT = status('ENABLED')
             else
-                pluginStatus = 'Camera not found'
-                SCRIPT_RESULT = pluginStatus
+                SCRIPT_RESULT = 'Camera not found'
             end
         end
         return true
     end
 
     if not active then
-        pluginStatus = status('DISABLED')
-        SCRIPT_RESULT = pluginStatus
+        SCRIPT_RESULT = status('DISABLED')
         return true
     end
 
@@ -325,25 +317,19 @@ function OnFrame()
     local rollSpeed = 0.01
     if Keyboard.IsKeyDown(cfg.rollLeft) then
         rotateAround(orient.forward, -rollSpeed)
-        rollAngle = rollAngle - rollSpeed
     elseif Keyboard.IsKeyDown(cfg.rollRight) then
         rotateAround(orient.forward, rollSpeed)
-        rollAngle = rollAngle + rollSpeed
     end
 
     local dx, dy = mouseDelta()
 
-    if dx ~= 0 then rotateAround(orient.up, -dx * cfg.mouseSens) end
+    if dx ~= 0 then rotateAround(orient.up, dx * cfg.mouseSens) end
     if dy ~= 0 then rotateAround(orient.right, dy * cfg.mouseSens) end
-
-    local _,_,cr = toEuler()
-    rotateAround(orient.forward, rollAngle - math.rad(cr))
 
     writeOrientation()
     writePosition()
     writeFov()
-    pluginStatus = status('ENABLED')
-    SCRIPT_RESULT = pluginStatus
+    SCRIPT_RESULT = status('ENABLED')
     return true
 end
 
@@ -351,10 +337,7 @@ if findCamStructure() then
     readOrientation()
     readPosition()
     fov = readFloat(CamStructure+0x670)
-    pluginStatus = status('loaded')
-    SCRIPT_RESULT = pluginStatus
+    SCRIPT_RESULT = status('loaded')
 else
-    pluginStatus = 'Waiting for camera...'
-    SCRIPT_RESULT = pluginStatus
+    SCRIPT_RESULT = 'Waiting for camera...'
 end
-
