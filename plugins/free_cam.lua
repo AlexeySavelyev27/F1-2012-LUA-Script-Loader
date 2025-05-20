@@ -203,6 +203,8 @@ local function writeFov()
 end
 
 local prevMouse = {x=0,y=0}
+-- Forward declaration for toEuler
+local toEuler
 local function mouseDelta()
     local pt = ffi.new('POINT[1]')
     if user32.GetCursorPos(pt) then
@@ -241,7 +243,7 @@ local function disable()
     active = false
 end
 
-local function toEuler()
+toEuler = function()
     local pitch = math.deg(math.asin(-orient.forward[2]))
     local yaw = math.deg(math.atan2(orient.forward[1], orient.forward[3]))
     local roll = math.deg(math.atan2(orient.up[1], orient.up[2]))
