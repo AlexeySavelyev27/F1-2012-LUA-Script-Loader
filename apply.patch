@@ -1,131 +1,331 @@
-diff --git a/plugins/free_cam.lua b/plugins/free_cam.lua
-index eb31271..638b9cd 100644
---- a/plugins/free_cam.lua
-+++ b/plugins/free_cam.lua
-@@ -187,50 +187,52 @@ local function writeOrientation()
-         orient.forward[1], orient.forward[2], orient.forward[3]
+diff --git a/main.cpp b/main.cpp
+index c9b9242..cdb5a27 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -102,50 +102,54 @@ struct Plugin {
+     lua_State* L = nullptr; // Dedicated Lua state for this plugin
+ };
+ 
+ // --- Globals ---
+ HookConfig config;
+ vector<Plugin> plugins;
+ int currentPlugin = 0;
+ bool overlayVisible = false;
+ bool initialized = false;
+ ProcessorRegisters currentRegisters = {};
+ HWND hwnd = nullptr;
+ WNDPROC oWndProc = nullptr;
+ Microsoft::WRL::ComPtr<ID3D11Device> device;
+ Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+ Microsoft::WRL::ComPtr<ID3D11RenderTargetView> mainRenderTargetView;
+ std::atomic<bool> stopMonitoring{ false };
+ std::unordered_map<std::string, Plugin> loadedPlugins;
+ std::thread monitorThread;
+ int currentWidth = 0;
+ int currentHeight = 0;
+ std::map<DWORD, BreakpointInfo> breakpointInfo;
+ bool insideBreakpointHandler = false;
+ PVOID vehHandle = nullptr;
+ int lua_ProtectMemory(lua_State* L);
+ 
++bool IsGameWindowActive() {
++    return hwnd && GetForegroundWindow() == hwnd;
++}
++
+ 
+ // --- Forward declarations ---
+ DWORD WINAPI MainThread(LPVOID);
+ void Log(const string& msg);
+ void InitLog(bool enableLogging);
+ LONG CALLBACK BreakpointExceptionHandler(EXCEPTION_POINTERS* ExceptionInfo);
+ void LoadPluginsWithoutExecution();
+ void ExecuteAllPlugins();
+ void RebuildPluginsVector();
+ void UpdateSinglePlugin(const std::string& baseName);
+ void MonitorDirectoryChanges(const std::string& directory);
+ void InitHook();
+ void RenderOverlay();
+ void CallPluginOnFrame();
+ string ExecuteLuaScript(const string& scriptPath, lua_State* L);
+ int GetVirtualKeyFromName(const string& keyName);
+ void SetupLuaKeyboardAPI(lua_State* L);
+ void RefreshCurrentPluginStatus();
+ 
+ // --- Logging ---
+ ofstream logFile;
+ 
+ void InitLog(bool enableLogging) {
+     if (!enableLogging) return;
+ 
+diff --git a/main.cpp b/main.cpp
+index c9b9242..cdb5a27 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -292,58 +296,64 @@ string ExecuteLuaScript(const string& scriptPath, lua_State* L) {
+ }
+ 
+ // Force refresh the status of the current plugin
+ void RefreshCurrentPluginStatus() {
+     if (plugins.empty()) return;
+ 
+     auto& plugin = plugins[currentPlugin];
+     plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
+     plugin.status = plugin.executionResult;
+ 
+     // Update in loadedPlugins too
+     for (auto& pair : loadedPlugins) {
+         if (pair.second.luaPath == plugin.luaPath) {
+             pair.second.executionResult = plugin.executionResult;
+             pair.second.status = plugin.status;
+             break;
+         }
      }
-     local o1 = {0x630,0x634,0x638,0x640,0x644,0x648,0x650,0x654,0x658}
-     local o2 = {0x6A0,0x6A4,0x6A8,0x6B0,0x6B4,0x6B8,0x6C0,0x6C4,0x6C8}
-     for i=1,9 do
-         writeFloat(CamStructure+o1[i], vals[i])
-         writeFloat(CamStructure+o2[i], vals[i])
-     end
- end
- local function writePosition()
-     local offs1 = {0x660,0x664,0x668}
-     local offs2 = {0x6D0,0x6D4,0x6D8}
-     for i=1,3 do
-         writeFloat(CamStructure+offs1[i], pos[i])
-         writeFloat(CamStructure+offs2[i], pos[i])
-     end
- end
- local function writeFov()
-     writeFloat(CamStructure+0x670, fov)
-     writeFloat(CamStructure+0x6E0, fov)
- end
  
- local screenCenter = {x=0, y=0}
- local VK_LBUTTON = 0x01
- local VK_RBUTTON = 0x02
-+local VK_MBUTTON = 0x04
-+local lmbHeld = false
+     Log("Refreshed plugin status: " + plugin.name + " = " + plugin.executionResult);
+ }
  
- local function isKeyDown(vk)
-     return bit.band(user32.GetAsyncKeyState(vk), 0x8000) ~= 0
- end
+ // Define C-style functions for Lua API
+ int lua_IsKeyDown(lua_State* L) {
+     int keyCode = luaL_checkinteger(L, 1);
+-    bool isDown = (GetAsyncKeyState(keyCode) & 0x8000) != 0;
++    bool isDown = false;
++    if (IsGameWindowActive()) {
++        isDown = (GetAsyncKeyState(keyCode) & 0x8000) != 0;
++    }
+     lua_pushboolean(L, isDown);
+     return 1;
+ }
  
- -- Forward declaration for toEuler
- local toEuler
- local function mouseDelta()
-     local pt = ffi.new('POINT[1]')
-     if user32.GetCursorPos(pt) then
-         local dx = pt[0].x - screenCenter.x
-         local dy = pt[0].y - screenCenter.y
-         user32.SetCursorPos(screenCenter.x, screenCenter.y)
-         return dx, dy
-     end
-     return 0,0
- end
+ int lua_IsKeyPressed(lua_State* L) {
+     int keyCode = luaL_checkinteger(L, 1);
+-    bool isPressed = (GetAsyncKeyState(keyCode) & 1) != 0;
++    bool isPressed = false;
++    if (IsGameWindowActive()) {
++        isPressed = (GetAsyncKeyState(keyCode) & 1) != 0;
++    }
+     lua_pushboolean(L, isPressed);
+     return 1;
+ }
  
- local function enable()
-     if not findCamStructure() then
-         return false
-     end
-     patch(renderOffsets)
-     patch(camOffsets)
-     readOrientation()
-diff --git a/plugins/free_cam.lua b/plugins/free_cam.lua
-index eb31271..638b9cd 100644
---- a/plugins/free_cam.lua
-+++ b/plugins/free_cam.lua
-@@ -335,57 +337,67 @@ function OnFrame()
-         pos[2] = pos[2] + orient.up[2]*speed
-         pos[3] = pos[3] + orient.up[3]*speed
-     end
+ int lua_ReadMemory(lua_State* L) {
+     DWORD64 address = (DWORD64)luaL_checkinteger(L, 1);
+     size_t size = luaL_checkinteger(L, 2);
+     vector<BYTE> buffer(size);
+     SIZE_T bytesRead;
  
-     if Keyboard.IsKeyDown(cfg.down) then
-         pos[1] = pos[1] - orient.up[1]*speed
-         pos[2] = pos[2] - orient.up[2]*speed
-         pos[3] = pos[3] - orient.up[3]*speed
-     end
+     if (ReadProcessMemory(GetCurrentProcess(), (LPCVOID)address, buffer.data(), size, &bytesRead)) {
+         switch (size) {
+         case 1: lua_pushinteger(L, buffer[0]); break;
+         case 2: lua_pushinteger(L, *(WORD*)buffer.data()); break;
+         case 4: lua_pushinteger(L, *(DWORD*)buffer.data()); break;
+         case 8: lua_pushinteger(L, *(DWORD64*)buffer.data()); break;
+         default: lua_pushnil(L); break;
+         }
+         return 1;
+     }
+     lua_pushnil(L);
+     return 1;
+ }
  
-     local fovSpeed = speed * 0.1
-     if Keyboard.IsKeyDown(cfg.fovUp) then
-         fov = fov + fovSpeed
-     elseif Keyboard.IsKeyDown(cfg.fovDown) then
-         fov = fov - fovSpeed
-     end
+ int lua_WriteMemory(lua_State* L) {
+diff --git a/main.cpp b/main.cpp
+index c9b9242..cdb5a27 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -1208,84 +1218,88 @@ HRESULT __stdcall hkPresent(IDXGISwapChain* pSwap, UINT SyncInterval, UINT Flags
+             mov currentRegisters.edx, edx
+             mov currentRegisters.esi, esi
+             mov currentRegisters.edi, edi
+             mov currentRegisters.ebp, ebp
+             mov currentRegisters.esp, esp
+         }
+ #endif
  
-     local rollSpeed = 0.01 * speedMod
-     if Keyboard.IsKeyDown(cfg.rollLeft) then
-         roll = roll - rollSpeed
-     elseif Keyboard.IsKeyDown(cfg.rollRight) then
-         roll = roll + rollSpeed
-     end
+         if (!mainRenderTargetView) {
+             Log("Recreating render target view");
+             Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+             HRESULT hr = pSwap->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
+             if (SUCCEEDED(hr) && backBuffer) {
+                 device->CreateRenderTargetView(backBuffer.Get(), nullptr, mainRenderTargetView.GetAddressOf());
  
-     local dx, dy = 0, 0
--    if isKeyDown(VK_LBUTTON) then
--        dx, dy = mouseDelta()
-+    local lmbDown = isKeyDown(VK_LBUTTON)
-+    if lmbDown then
-+        if not lmbHeld then
-+            user32.SetCursorPos(screenCenter.x, screenCenter.y)
-+            dx, dy = 0, 0
-+        else
-+            dx, dy = mouseDelta()
-+        end
-     end
-+    lmbHeld = lmbDown
-     local lookSpeed = cfg.mouseSens * 0.5
-     if isKeyDown(VK_RBUTTON) then
-         lookSpeed = lookSpeed * 2
-     end
-+    if isKeyDown(VK_MBUTTON) then
-+        lookSpeed = lookSpeed / 10
-+    end
-     if dx ~= 0 then yaw = yaw - dx * lookSpeed end
-     if dy ~= 0 then pitch = pitch + dy * lookSpeed end
+                 ImGui_ImplDX11_InvalidateDeviceObjects();
+                 ImGui_ImplDX11_CreateDeviceObjects();
+                 Log("Render target recreated");
+             }
+         }
+     }
  
-     if pitch > math.pi/2 - 0.001 then pitch = math.pi/2 - 0.001 end
-     if pitch < -math.pi/2 + 0.001 then pitch = -math.pi/2 + 0.001 end
+     int toggleKey = GetVirtualKeyFromName(config.toggleKey);
+     int closeKey = GetVirtualKeyFromName(config.closeKey);
+     int reloadKey = GetVirtualKeyFromName(config.reloadKey);
++    bool gameActive = IsGameWindowActive();
  
-     updateOrientation()
+-    if ((GetAsyncKeyState(toggleKey) & 1)) {
+-        if (!overlayVisible) {
+-            overlayVisible = true;
+-            Log("Overlay shown (" + config.toggleKey + ")");
+-        }
+-        else if (!plugins.empty()) {
+-            currentPlugin = (currentPlugin + 1) % plugins.size();
+-            Log("Plugin switched to: " + plugins[currentPlugin].name);
++    if (gameActive) {
++        if ((GetAsyncKeyState(toggleKey) & 1)) {
++            if (!overlayVisible) {
++                overlayVisible = true;
++                Log("Overlay shown (" + config.toggleKey + ")");
++            } else if (!plugins.empty()) {
++                currentPlugin = (currentPlugin + 1) % plugins.size();
++                Log("Plugin switched to: " + plugins[currentPlugin].name);
++            }
+         }
+-    }
  
-     writeOrientation()
-     writePosition()
-     writeFov()
-     SCRIPT_RESULT = status('ENABLED')
-     return true
- end
+-    if ((GetAsyncKeyState(reloadKey) & 1) && overlayVisible && !plugins.empty()) {
+-        auto& plugin = plugins[currentPlugin];
+-        plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
+-        plugin.status = plugin.executionResult;
+-        Log("Manually re-executed current plugin: " + plugin.name + " using key " + config.reloadKey);
+-    }
++        if ((GetAsyncKeyState(reloadKey) & 1) && overlayVisible && !plugins.empty()) {
++            auto& plugin = plugins[currentPlugin];
++            plugin.executionResult = ExecuteLuaScript(plugin.luaPath, plugin.L);
++            plugin.status = plugin.executionResult;
++            Log("Manually re-executed current plugin: " + plugin.name + " using key " + config.reloadKey);
++        }
  
- if findCamStructure() then
-     readOrientation()
-     readPosition()
-     fov = readFloat(CamStructure+0x670)
-     local p,y,r = toEuler()
-     pitch = math.rad(p)
-     yaw = math.rad(y)
-     roll = math.rad(r)
-     SCRIPT_RESULT = status('loaded')
- else
+-    if (GetAsyncKeyState(closeKey) & 1) {
+-        overlayVisible = false;
+-        Log("Overlay hidden (" + config.closeKey + ")");
++        if (GetAsyncKeyState(closeKey) & 1) {
++            overlayVisible = false;
++            Log("Overlay hidden (" + config.closeKey + ")");
++        }
+     }
+ 
+     if (initialized) {
+         if (overlayVisible) {
+             // Make sure the current plugin status is set
+             if (!plugins.empty() && (plugins[currentPlugin].executionResult.empty() ||
+                 plugins[currentPlugin].executionResult == "Pending execution")) {
+                 RefreshCurrentPluginStatus();
+             }
+         }
+ 
+-        CallPluginOnFrame();
++        if (gameActive) {
++            CallPluginOnFrame();
++        }
+     }
+ 
+     if (initialized && mainRenderTargetView) {
+         ImGui_ImplDX11_NewFrame();
+         ImGui_ImplWin32_NewFrame();
+         ImGui::NewFrame();
+ 
+         if (overlayVisible) {
+             RenderOverlay();
+         }
+ 
+         ImGui::Render();
+         context->OMSetRenderTargets(1, mainRenderTargetView.GetAddressOf(), nullptr);
+         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+     }
+ 
+     return oPresent(pSwap, SyncInterval, Flags);
+ }
+ 
+ // --- Hook Initialization ---
+ void InitHook() {
+     Log("Initializing DirectX hook...");
+ 
+     DXGI_SWAP_CHAIN_DESC scDesc = {};
+     scDesc.BufferCount = 1;
+diff --git a/main.cpp b/main.cpp
+index c9b9242..cdb5a27 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -1351,51 +1365,51 @@ DWORD WINAPI MainThread(LPVOID) {
+     }
+ 
+     // Start monitoring the plugins directory
+     monitorThread = std::thread(MonitorDirectoryChanges, config.pluginFolder);
+ 
+     return 0;
+ }
+ 
+ // --- DllMain ---
+ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID) {
+     switch (fdwReason) {
+     case DLL_PROCESS_ATTACH:
+         DisableThreadLibraryCalls(hinstDLL);
+         // Set up exception handler before starting the main thread
+         SetUnhandledExceptionFilter(BreakpointExceptionHandler);
+         vehHandle = AddVectoredExceptionHandler(1, BreakpointExceptionHandler);
+         LoadConfig();
+         CreateThread(nullptr, 0, MainThread, nullptr, 0, nullptr);
+         break;
+ 
+     case DLL_PROCESS_DETACH:
+         stopMonitoring = true;
+         if (monitorThread.joinable()) {
+             monitorThread.join();
+         }
+-		
++
+         if (hwnd && oWndProc) {
+             SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
+             oWndProc = nullptr;
+             hwnd = nullptr;
+         }
+ 
+         // Remove all breakpoints on exit
+         for (auto& pair : breakpointInfo) {
+             DWORD address = pair.first;
+             BreakpointInfo& info = pair.second;
+ 
+             DWORD oldProtect;
+             VirtualProtect((LPVOID)address, 1, PAGE_EXECUTE_READWRITE, &oldProtect);
+             WriteProcessMemory(GetCurrentProcess(), (LPVOID)address, &info.originalByte, 1, nullptr);
+             VirtualProtect((LPVOID)address, 1, oldProtect, &oldProtect);
+         }
+         breakpointInfo.clear();
+ 
+         // Close all plugin Lua states
+         for (auto& p : loadedPlugins) {
+             if (p.second.L) {
+                 lua_close(p.second.L);
+                 p.second.L = nullptr;
+             }
+         }
+diff --git a/main.cpp b/main.cpp
+index c9b9242..cdb5a27 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -1439,26 +1453,26 @@ extern "C" __declspec(dllexport) HRESULT WINAPI DirectInput8Create(
+     DWORD dwVersion,
+     REFIID riid,
+     LPVOID* ppvOut,
+     LPUNKNOWN punkOuter)
+ {
+     Log("DirectInput8Create called");
+ 
+     char sysPath[MAX_PATH];
+     GetSystemDirectoryA(sysPath, MAX_PATH);
+     strcat_s(sysPath, "\\dinput8.dll");
+ 
+     HMODULE realDInput = LoadLibraryA(sysPath);
+     if (!realDInput) {
+         Log("Failed to load system dinput8.dll");
+         return E_FAIL;
+     }
+ 
+     using DInputCreateFn = HRESULT(WINAPI*)(HINSTANCE, DWORD, REFIID, LPVOID*, LPUNKNOWN);
+     auto original = (DInputCreateFn)GetProcAddress(realDInput, "DirectInput8Create");
+     if (!original) {
+         Log("Failed to get DirectInput8Create address");
+         return E_FAIL;
+     }
+ 
+     return original(hinst, dwVersion, riid, ppvOut, punkOuter);
+-}
++}
