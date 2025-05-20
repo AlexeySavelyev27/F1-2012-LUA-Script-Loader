@@ -1,9 +1,13 @@
 local ffi = require('ffi')
+local bit = require('bit')
 local user32 = ffi.load('user32')
 
 ffi.cdef[[
 typedef struct { long x; long y; } POINT;
 bool GetCursorPos(POINT* lpPoint);
+bool SetCursorPos(int X, int Y);
+short GetAsyncKeyState(int vKey);
+int GetSystemMetrics(int nIndex);
 ]]
 
 -- Helper to parse simple ini format
@@ -202,16 +206,22 @@ local function writeFov()
     writeFloat(CamStructure+0x6E0, fov)
 end
 
-local prevMouse = {x=0,y=0}
+local screenCenter = {x=0, y=0}
+local VK_LBUTTON = 0x01
+local VK_RBUTTON = 0x02
+
+local function isKeyDown(vk)
+    return bit.band(user32.GetAsyncKeyState(vk), 0x8000) ~= 0
+end
+
 -- Forward declaration for toEuler
 local toEuler
 local function mouseDelta()
     local pt = ffi.new('POINT[1]')
     if user32.GetCursorPos(pt) then
-        local dx = pt[0].x - prevMouse.x
-        local dy = pt[0].y - prevMouse.y
-        prevMouse.x = pt[0].x
-        prevMouse.y = pt[0].y
+        local dx = pt[0].x - screenCenter.x
+        local dy = pt[0].y - screenCenter.y
+        user32.SetCursorPos(screenCenter.x, screenCenter.y)
         return dx, dy
     end
     return 0,0
@@ -230,10 +240,9 @@ local function enable()
     pitch = math.rad(p)
     yaw = math.rad(y)
     roll = math.rad(r)
-    local pt = ffi.new('POINT[1]')
-    user32.GetCursorPos(pt)
-    prevMouse.x = pt[0].x
-    prevMouse.y = pt[0].y
+    screenCenter.x = user32.GetSystemMetrics(0) / 2
+    screenCenter.y = user32.GetSystemMetrics(1) / 2
+    user32.SetCursorPos(screenCenter.x, screenCenter.y)
     active = true
     return true
 end
@@ -253,8 +262,8 @@ end
 local function status(state)
     local pitch,yaw,roll = toEuler()
     return string.format(
-        "FreeCam %s. Press %s to toggle.\nCurrent coordinates: x = %.2f, y = %.2f, z = %.2f\nCurrent oriantation: pitch = %.2f, yaw = %.2f, roll = %.2f",
-        state, toggleName, pos[1], pos[2], pos[3], pitch, yaw, roll)
+        "FreeCam %s. Press %s to toggle.\nCurrent coordinates: x = %.2f, y = %.2f, z = %.2f\nCurrent oriantation: pitch = %.2f, yaw = %.2f, roll = %.2f\nCurrent fov: %.2f",
+        state, toggleName, pos[1], pos[2], pos[3], pitch, yaw, roll, fov)
 end
 
 function OnFrame()
@@ -333,10 +342,11 @@ function OnFrame()
         pos[3] = pos[3] - orient.up[3]*speed
     end
 
+    local fovSpeed = speed * 0.1
     if Keyboard.IsKeyDown(cfg.fovUp) then
-        fov = fov + speed
+        fov = fov + fovSpeed
     elseif Keyboard.IsKeyDown(cfg.fovDown) then
-        fov = fov - speed
+        fov = fov - fovSpeed
     end
 
     local rollSpeed = 0.01 * speedMod
@@ -346,10 +356,16 @@ function OnFrame()
         roll = roll + rollSpeed
     end
 
-    local dx, dy = mouseDelta()
-
-    if dx ~= 0 then yaw = yaw - dx * cfg.mouseSens * speedMod end
-    if dy ~= 0 then pitch = pitch + dy * cfg.mouseSens * speedMod end
+    local dx, dy = 0, 0
+    if isKeyDown(VK_LBUTTON) then
+        dx, dy = mouseDelta()
+    end
+    local lookSpeed = cfg.mouseSens * 0.5
+    if isKeyDown(VK_RBUTTON) then
+        lookSpeed = lookSpeed * 2
+    end
+    if dx ~= 0 then yaw = yaw - dx * lookSpeed end
+    if dy ~= 0 then pitch = pitch + dy * lookSpeed end
 
     if pitch > math.pi/2 - 0.001 then pitch = math.pi/2 - 0.001 end
     if pitch < -math.pi/2 + 0.001 then pitch = -math.pi/2 + 0.001 end
