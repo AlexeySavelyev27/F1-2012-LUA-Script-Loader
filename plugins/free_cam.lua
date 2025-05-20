@@ -209,6 +209,8 @@ end
 local screenCenter = {x=0, y=0}
 local VK_LBUTTON = 0x01
 local VK_RBUTTON = 0x02
+local VK_MBUTTON = 0x04
+local lmbHeld = false
 
 local function isKeyDown(vk)
     return bit.band(user32.GetAsyncKeyState(vk), 0x8000) ~= 0
@@ -332,18 +334,17 @@ function OnFrame()
 
     if Keyboard.IsKeyDown(cfg.up) then
         pos[1] = pos[1] + orient.up[1]*speed
-		pos[2] = pos[2] + orient.up[2]*speed
+        pos[2] = pos[2] + orient.up[2]*speed
         pos[3] = pos[3] + orient.up[3]*speed
     end
- 
+
     if Keyboard.IsKeyDown(cfg.down) then
         pos[1] = pos[1] - orient.up[1]*speed
         pos[2] = pos[2] - orient.up[2]*speed
         pos[3] = pos[3] - orient.up[3]*speed
     end
- 
+
     local fovSpeed = speed * 0.1
- 
     if Keyboard.IsKeyDown(cfg.fovUp) then
         fov = fov + fovSpeed
     elseif Keyboard.IsKeyDown(cfg.fovDown) then
@@ -356,7 +357,7 @@ function OnFrame()
     elseif Keyboard.IsKeyDown(cfg.rollRight) then
         roll = roll + rollSpeed
     end
- 
+
     local dx, dy = 0, 0
     local lmbDown = isKeyDown(VK_LBUTTON)
     if lmbDown then
@@ -367,7 +368,7 @@ function OnFrame()
             dx, dy = mouseDelta()
         end
     end
-	lmbHeld = lmbDown
+    lmbHeld = lmbDown
     local lookSpeed = cfg.mouseSens * 0.5
     if isKeyDown(VK_RBUTTON) then
         lookSpeed = lookSpeed * 2
