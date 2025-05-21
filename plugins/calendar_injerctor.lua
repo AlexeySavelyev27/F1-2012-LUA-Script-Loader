@@ -323,7 +323,6 @@
             
             -- Find the corresponding track in our database
             local trackAddress = nil
-            local exactMatch = false
             local bestMatchName = ""
             local bestMatchAddr = 0
             
@@ -331,7 +330,6 @@
             for _, track in pairs(trackDatabase) do
                 if track.name:lower() == info.name:lower() then
                     trackAddress = track.address
-                    exactMatch = true
                     break
                 end
                 
@@ -667,7 +665,6 @@
                 writeLog("F6 pressed - initializating save modifying")
                 SCRIPT_RESULT = "Initializing save modifying by user request (F6)..."
                 initialize2()
-                initialized2ByUser = true
             else
                 
                 writeLog("F6 pressed - reinitializing")
