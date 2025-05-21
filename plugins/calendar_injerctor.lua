@@ -214,6 +214,16 @@
         return trackCount > 0
     end
 
+    -- Reset original track order numbers
+    local function clearTrackPositions()
+        for _, track in pairs(trackDatabase) do
+            Memory.WriteMemory(track.address, 0, 4)
+            Memory.WriteMemory(track.address + 0x70, 0, 4)
+            Memory.WriteMemory(track.address + 0x110, 0, 4)
+        end
+        writeLog("Cleared original track positions")
+    end
+
     -- Function to parse the INI file (improved version)
     local function parseCalendarFromIni()
         -- Determine the path to the INI file
@@ -569,7 +579,6 @@
 		return true
 	end
 
-    local initializedByUser = false
 
     -- Function to initialize the modification
     local function initialize1()
@@ -590,6 +599,8 @@
             return false
         end
 
+        clearTrackPositions()
+
         -- Step 3: Parse calendar from INI file
         if not parseCalendarFromIni() then
             SCRIPT_RESULT = "Error parsing INI file"
@@ -609,8 +620,8 @@
         end
 
         writeLog("Initialization completed successfully")
-        SCRIPT_RESULT = "Custom calendar successfully activated (" ..
-                        customArray.count .. " races). Select your save and hit F6."
+        SCRIPT_RESULT = "Custom calendar activated (" ..
+                        customArray.count .. " races). Waiting for save..."
 
         initialized = true
         return true
@@ -637,51 +648,43 @@
 		initialized2 = true
 	end
 
-    -- OnFrame function that initializes on F5
+    local waitingForSave = false
+
     function OnFrame()
+        if not initialized then
+            initialize1()
+            if initialized then
+                waitingForSave = true
+            end
+            return true
+        end
+
+        if waitingForSave and not initialized2 and customStructure.address ~= 0 then
+            local val = Memory.ReadMemory(customStructure.address + 0x0C, 4)
+            if val and val ~= 0 then
+                initialize2()
+                waitingForSave = false
+            else
+                SCRIPT_RESULT = "Waiting for save to be loaded..."
+            end
+            return true
+        end
 
         if Keyboard.IsKeyPressed(Keys.VK_F5) then
-            if not initialized then
-
-                writeLog("F5 pressed - starting initialization")
-                SCRIPT_RESULT = "Initializing calendar by user request (F5)..."
-                initialize1()
-                initializedByUser = true
-            else
-
-                writeLog("F5 pressed - reinitializing")
-                SCRIPT_RESULT = "Reinitializing calendar by user request (F5)..."
-
-                initialized = false
-                initialize1()
-            end
+            initialized = false
+            initialize1()
+            waitingForSave = initialized
             return true
         end
 
-		--Objective Manager Initialization
         if Keyboard.IsKeyPressed(Keys.VK_F6) then
-            if not initialized2 then
-
-                writeLog("F6 pressed - initializating save modifying")
-                SCRIPT_RESULT = "Initializing save modifying by user request (F6)..."
-                initialize2()
-            else
-
-                writeLog("F6 pressed - reinitializing")
-                SCRIPT_RESULT = "Reinitializing save modifying by user request (F6)..."
-
-                initialized2 = false
-                initialize2()
-            end
+            initialized2 = false
+            initialize2()
             return true
-        end
-
-        if not initialized and not initializedByUser then
-            SCRIPT_RESULT = "Press F5 to activate custom calendar"
         end
 
         return false
     end
 
-	SCRIPT_RESULT = "Press F5 to activate custom calendar"
+    SCRIPT_RESULT = "Waiting for game initialization..."
 end)()
