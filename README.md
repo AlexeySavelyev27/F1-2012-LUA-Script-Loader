@@ -1,4 +1,4 @@
-# F1hook
+# F1 2012 LUA Script Loader
 
 This project is a Lua plugin loader for the game **F1 2012**.  The code builds a
 `dinput8.dll` that is injected into the game to provide an in-game overlay and
