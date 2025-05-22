@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--BinXML-->
+<vehicle_type_track_data version_major="3" version_minor="0" version_revision="0" high_grip="0.920989" med_grip="0.727972" low_grip="0.441000">
+  <vehicle_track name="default">
+    <vehicle_types>
+      <vehicle_type name="default_A">
+        <brake_lines num_brake_lines="16">
+          <brake_line id="0">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.05" distance_modifier_med_grip="1.17" distance_modifier_low_grip="1.21" hold_line_id="1" hold_distance_modifier="0.00" curve_modifier="1.08" curve_modifier_med_grip="0.96" curve_modifier_low_grip="0.90" />
+          </brake_line>
+          <brake_line id="10">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="-0.03" hold_line_id="2" hold_distance_modifier="0.00" curve_modifier="1.10" curve_modifier_med_grip="1.05" curve_modifier_low_grip="1.00" />
+          </brake_line>
+          <brake_line id="20">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.02" distance_modifier_med_grip="1.11" distance_modifier_low_grip="1.15" hold_line_id="3" hold_distance_modifier="0.00" curve_modifier="1.14" curve_modifier_med_grip="0.98" curve_modifier_low_grip="0.93" />
+          </brake_line>
+          <brake_line id="30">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.05" distance_modifier_med_grip="1.15" distance_modifier_low_grip="1.20" hold_line_id="4" hold_distance_modifier="0.00" curve_modifier="1.04" curve_modifier_med_grip="0.95" curve_modifier_low_grip="0.90" />
+          </brake_line>
+          <brake_line id="40">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.05" distance_modifier_med_grip="1.13" distance_modifier_low_grip="1.15" hold_line_id="5" hold_distance_modifier="0.00" curve_modifier="1.11" curve_modifier_med_grip="1.00" curve_modifier_low_grip="0.97" />
+          </brake_line>
+          <brake_line id="50">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.03" distance_modifier_med_grip="1.15" distance_modifier_low_grip="1.18" hold_line_id="6" hold_distance_modifier="0.00" curve_modifier="1.07" curve_modifier_med_grip="0.99" curve_modifier_low_grip="0.95" />
+          </brake_line>
+          <brake_line id="60">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.07" distance_modifier_med_grip="1.15" distance_modifier_low_grip="1.20" hold_line_id="7" hold_distance_modifier="0.00" curve_modifier="1.10" curve_modifier_med_grip="0.98" curve_modifier_low_grip="0.90" />
+          </brake_line>
+          <brake_line id="70">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.10" distance_modifier_med_grip="1.22" distance_modifier_low_grip="1.26" hold_line_id="8" hold_distance_modifier="0.00" curve_modifier="1.09" curve_modifier_med_grip="0.95" curve_modifier_low_grip="0.90" />
+          </brake_line>
+          <brake_line id="80">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.00" distance_modifier_med_grip="1.08" distance_modifier_low_grip="1.12" hold_line_id="9" hold_distance_modifier="0.00" curve_modifier="1.02" curve_modifier_med_grip="0.95" curve_modifier_low_grip="0.92" />
+          </brake_line>
+          <brake_line id="90">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.10" distance_modifier_med_grip="1.20" distance_modifier_low_grip="1.25" hold_line_id="10" hold_distance_modifier="0.00" curve_modifier="0.99" curve_modifier_med_grip="0.87" curve_modifier_low_grip="0.85" />
+          </brake_line>
+          <brake_line id="100">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.05" distance_modifier_med_grip="1.13" distance_modifier_low_grip="1.17" hold_line_id="11" hold_distance_modifier="0.00" curve_modifier="1.03" curve_modifier_med_grip="0.93" curve_modifier_low_grip="0.90" />
+          </brake_line>
+          <brake_line id="110">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.06" hold_line_id="12" hold_distance_modifier="0.00" curve_modifier="1.10" curve_modifier_med_grip="0.97" curve_modifier_low_grip="0.92" />
+          </brake_line>
+          <brake_line id="120">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.13" hold_time="1.50" curve_modifier="1.10" curve_modifier_med_grip="1.04" curve_modifier_low_grip="1.00" />
+          </brake_line>
+          <brake_line id="908">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.08" hold_line_id="0" hold_distance_modifier="0.00" curve_modifier="1.05" />
+          </brake_line>
+          <brake_line id="909">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="1.00" hold_line_id="1" hold_distance_modifier="0.00" curve_modifier="1.00" />
+          </brake_line>
+          <brake_line id="990">
+            <brake_data type="curve" min_speed="0.0" max_speed="0.0" drift_speed="-5.0" distance_modifier="0.96" distance_modifier_med_grip="1.04" distance_modifier_low_grip="1.12" hold_line_id="0" hold_distance_modifier="0.00" curve_modifier="1.18" curve_modifier_med_grip="1.02" curve_modifier_low_grip="0.93" />
+          </brake_line>
+        </brake_lines>
+        <speed_lines num_speed_lines="0" />
+      </vehicle_type>
+    </vehicle_types>
+  </vehicle_track>
+  <vehicle_track name="low">
+    <vehicle_types />
+  </vehicle_track>
+  <vehicle_track name="mid">
+    <vehicle_types />
+  </vehicle_track>
+  <vehicle_track name="vhigh">
+    <vehicle_types />
+  </vehicle_track>
+  <vehicle_track name="vlow">
+    <vehicle_types />
+  </vehicle_track>
+</vehicle_type_track_data>
