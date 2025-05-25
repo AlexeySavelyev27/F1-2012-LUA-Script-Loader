@@ -1,5 +1,52 @@
 local ffi = require('ffi')
 
+-- simple ini parser for controls section
+local function parseIni(path)
+    local data = {}
+    local section
+    for line in io.lines(path) do
+        line = line:gsub('[\r\n]+', '')
+        if line:match('^%s*;') or line:match('^%s*$') then
+        elseif line:match('^%[') then
+            section = line:match('%[(.-)%]')
+        else
+            local key, value = line:match('([^=]+)=([^=]+)')
+            if key and value and section == 'Controls' then
+                data[key:match('^%s*(.-)%s*$')] = value:match('^%s*(.-)%s*$')
+            end
+        end
+    end
+    return data
+end
+
+-- virtual key conversion helper
+local vkeys = {
+    BACKSPACE = 0x08, TAB = 0x09, ENTER = 0x0D, SHIFT = 0x10, CTRL = 0x11,
+    ALT = 0x12, PAUSE = 0x13, CAPSLOCK = 0x14, ESC = 0x1B, SPACE = 0x20,
+    PAGEUP = 0x21, PAGEDOWN = 0x22, END = 0x23, HOME = 0x24,
+    LEFT = 0x25, UP = 0x26, RIGHT = 0x27, DOWN = 0x28,
+    INSERT = 0x2D, DELETE = 0x2E,
+    LSHIFT = 0xA0, RSHIFT = 0xA1, LCTRL = 0xA2, RCTRL = 0xA3,
+    LALT = 0xA4, RALT = 0xA5
+}
+for i = 0, 9 do vkeys[tostring(i)] = 0x30 + i end
+for i = 0, 25 do vkeys[string.char(65 + i)] = 0x41 + i end
+for i = 1, 12 do vkeys['F'..i] = 0x6F + i end
+
+local function keyCode(name)
+    if not name then return 0 end
+    name = name:upper()
+    if tonumber(name) then return tonumber(name) end
+    if vkeys[name] then return vkeys[name] end
+    if name:sub(1, 2) == '0X' then return tonumber(name) end
+    return 0
+end
+
+local iniPath = debug.getinfo(1, 'S').source:match('@(.+)[/\\]') .. '/telemetry_logger.ini'
+local controls = parseIni(iniPath)
+local startName = controls.StartLogging or 'F9'
+local startKey = keyCode(startName)
+
 local function readFloat(addr)
     return ffi.cast('float*', addr)[0]
 end
@@ -48,16 +95,20 @@ local curLap
 local index = 0
 local file
 local points = {}
+local active = false
 
 local function openLap(lap)
     if file then file:close() end
     local path = string.format('telemetry_lap_%d.csv', lap)
     file = io.open(path, 'w')
-    if file then
-        file:write('index,x,y,z,speed,gear,throttle,brake,drs,kers\n')
+    if not file then
+        SCRIPT_RESULT = string.format('Failed to open %s', path)
+        return false
     end
+    file:write('index,x,y,z,speed,gear,throttle,brake,drs,kers\n')
     points = {}
     index = 0
+    return true
 end
 
 local function writeObj(lap)
@@ -75,6 +126,16 @@ function OnFrame()
     frame = frame + 1
     if frame % 5 ~= 0 then return true end
 
+    if not active then
+        if Keyboard.IsKeyPressed(startKey) then
+            active = true
+            SCRIPT_RESULT = 'Logging started'
+        else
+            SCRIPT_RESULT = string.format('Press %s to start logging', startName)
+        end
+        return true
+    end
+
     local cBase = carBase()
     if not cBase then
         SCRIPT_RESULT = 'Waiting for car...'
@@ -83,9 +144,20 @@ function OnFrame()
 
     local lap = lapNumber() or 0
     if curLap ~= lap then
-        if curLap then writeObj(curLap) end
+        if curLap then
+            writeObj(curLap)
+        end
+        if lap == 0 then
+            if file then file:close() end
+            file = nil
+            active = false
+            SCRIPT_RESULT = 'Logging finished'
+            return true
+        end
         curLap = lap
-        openLap(lap)
+        if openLap(lap) then
+            SCRIPT_RESULT = string.format('Started lap %d', lap)
+        end
     end
     if not file then return true end
 
@@ -115,4 +187,15 @@ function OnFrame()
 
     SCRIPT_RESULT = string.format('Lap %d: %d samples', curLap, index)
     return true
+end
+
+function OnPluginEnd()
+    if file then
+        file:close()
+        file = nil
+    end
+    if curLap then
+        writeObj(curLap)
+    end
+    active = false
 end
