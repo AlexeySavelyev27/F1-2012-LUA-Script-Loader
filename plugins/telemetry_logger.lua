@@ -53,11 +53,14 @@ local function openLap(lap)
     if file then file:close() end
     local path = string.format('telemetry_lap_%d.csv', lap)
     file = io.open(path, 'w')
-    if file then
-        file:write('index,x,y,z,speed,gear,throttle,brake,drs,kers\n')
+    if not file then
+        SCRIPT_RESULT = string.format('Failed to open %s', path)
+        return false
     end
+    file:write('index,x,y,z,speed,gear,throttle,brake,drs,kers\n')
     points = {}
     index = 0
+    return true
 end
 
 local function writeObj(lap)
@@ -115,4 +118,14 @@ function OnFrame()
 
     SCRIPT_RESULT = string.format('Lap %d: %d samples', curLap, index)
     return true
+end
+
+function OnPluginEnd()
+    if file then
+        file:close()
+        file = nil
+    end
+    if curLap then
+        writeObj(curLap)
+    end
 end
