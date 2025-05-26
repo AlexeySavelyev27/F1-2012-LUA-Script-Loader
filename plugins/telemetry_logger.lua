@@ -9,8 +9,6 @@ local function writeLog(message, clear)
     end
 end
 
-writeLog('Starting new session', true)
-
 -- simple ini parser for controls section
 local function parseIni(path)
     local data = {}
@@ -120,6 +118,32 @@ local function brakeAddr()
     return resolve(base + 0xD96F94, {0xF0, 0x8, 0x3C, 0x60, 0x4C, 0x4})
 end
 
+local ORIENT_OFFSET = 0x150
+
+local function readOrientation(cBase)
+    if not cBase then
+        return {{0,0,0},{0,0,0},{0,0,0}}
+    end
+    return {
+        {readFloat(cBase + ORIENT_OFFSET), readFloat(cBase + ORIENT_OFFSET + 4), readFloat(cBase + ORIENT_OFFSET + 8)},
+        {readFloat(cBase + ORIENT_OFFSET + 0x10), readFloat(cBase + ORIENT_OFFSET + 0x14), readFloat(cBase + ORIENT_OFFSET + 0x18)},
+        {readFloat(cBase + ORIENT_OFFSET + 0x20), readFloat(cBase + ORIENT_OFFSET + 0x24), readFloat(cBase + ORIENT_OFFSET + 0x28)}
+    }
+end
+
+local active = false
+local debugStr = ''
+
+local function updateDebug(lap, x, y, z, orient, thr, brk, spd, gear, drs, kers)
+    debugStr = string.format(
+        'Current data:\nlap: %d\nx: %.3f; y: %.3f; z: %.3f\norientation:\n{%.3f; %.3f; %.3f;\n %.3f; %.3f; %.3f;\n %.3f; %.3f; %.3f}\nthrottle: %.2f; brake: %.2f\nspeed: %.3f; gear: %d\ndrs: %d; kers: %d',
+        lap, x, y, z,
+        orient[1][1], orient[1][2], orient[1][3],
+        orient[2][1], orient[2][2], orient[2][3],
+        orient[3][1], orient[3][2], orient[3][3],
+        thr, brk, spd, gear, drs, kers)
+end
+
 local frame = 0
 local active = false
 local curLap
@@ -177,8 +201,9 @@ function OnFrame()
     if not active then
         if Keyboard.IsKeyPressed(startKey) then
             active = true
-            SCRIPT_RESULT = 'Logging started'
-            debugStr = ''
+            status = 'Waiting for car...'
+            updateDebug(0, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
+            SCRIPT_RESULT = status .. '\n' .. debugStr
         else
             SCRIPT_RESULT = status
         end
@@ -210,6 +235,7 @@ function OnFrame()
 
     if not cBase then
         status = 'Waiting for car...'
+        updateDebug(0, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
         SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
     end
@@ -230,11 +256,12 @@ function OnFrame()
         curLap = lap
 
         if not openLap(lap) then
+            updateDebug(lap, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
             return true
         end
     end
     if not file then
-        SCRIPT_RESULT = status .. "\n" .. debugStr
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
 
     end
@@ -243,6 +270,7 @@ function OnFrame()
     local x = readFloat(cBase + 0x1A0)
     local y = readFloat(cBase + 0x1A4)
     local z = readFloat(cBase + 0x1A8)
+    local orient = readOrientation(cBase)
 
     local sAddr = speedAddr()
     local speed = sAddr and readFloat(sAddr) or 0
@@ -259,11 +287,8 @@ function OnFrame()
     local drs = gBase and Memory.ReadMemory(gBase + 0x29C, 4) or 0
     local kers = gBase and Memory.ReadMemory(gBase + 0x294, 4) or 0
 
-    writeLog(string.format(
-        'cBase=0x%X lapPtr=0x%X lap=%d sAddr=0x%X speed=%.3f gBase=0x%X gear=%d '
-        .. 'thrPtr=0x%X throttle=%.2f brkPtr=0x%X brake=%.2f drs=%d kers=%d',
-        cBase or 0, lapPtr or 0, lap, sAddr or 0, speed, gBase or 0, gear,
-        thrPtr or 0, throttle, brkPtr or 0, brake, drs, kers))
+    updateDebug(lap, x, y, z, orient, throttle, brake, speed, gear, drs, kers)
+
     index = index + 1
     file:write(string.format('%d,%.6f,%.6f,%.6f,%.3f,%d,%.2f,%.2f,%d,%d\n',
         index, x, y, z, speed, gear, throttle, brake, drs, kers))
