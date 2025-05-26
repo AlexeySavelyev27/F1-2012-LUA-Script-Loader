@@ -1,5 +1,16 @@
 local ffi = require('ffi')
 
+local function writeLog(message, clear)
+    local mode = clear and 'w' or 'a'
+    local logFile = io.open('telemetry_debug.log', mode)
+    if logFile then
+        logFile:write(os.date('%Y-%m-%d %H:%M:%S') .. ': ' .. message .. '\n')
+        logFile:close()
+    end
+end
+
+
+
 -- simple ini parser for controls section
 local function parseIni(path)
     local data = {}
@@ -60,7 +71,10 @@ local function readPtr(addr)
 end
 
 local function resolve(startAddr, offsets)
-    local addr = startAddr
+    local addr = readPtr(startAddr)
+    if not addr or addr == 0 then
+        return nil
+    end
     for i = 1, #offsets do
         addr = readPtr(addr + offsets[i])
         if not addr or addr == 0 then
@@ -74,12 +88,18 @@ local function carBase()
     return resolve(base + 0xDD5ABC, {0x50, 0x4A8, 0x38})
 end
 
-local function lapNumber()
+local function lapAddr()
     local ptr = readPtr(base + 0xDD5A94)
     if not ptr then return nil end
     ptr = readPtr(ptr + 0x78)
     if not ptr then return nil end
-    return Memory.ReadMemory(ptr + 0xA18, 4)
+    return ptr + 0xA18
+end
+
+local function lapNumber()
+    local addr = lapAddr()
+    if not addr then return nil end
+    return Memory.ReadMemory(addr, 4), addr
 end
 
 local function speedAddr()
@@ -90,6 +110,40 @@ end
 
 local function gearBase()
     return resolve(base + 0xDD0D28, {0x24, 0x20, 0x70, 0x10, 0x38})
+end
+
+local function throttleAddr()
+    return resolve(base + 0xD9A6D8, {0x64, 0x78, 0x8, 0x4, 0x4C})
+end
+
+local function brakeAddr()
+    return resolve(base + 0xD96F94, {0xF0, 0x8, 0x3C, 0x60, 0x4C, 0x4})
+end
+
+local ORIENT_OFFSET = 0x150
+
+local function readOrientation(cBase)
+    if not cBase then
+        return {{0,0,0},{0,0,0},{0,0,0}}
+    end
+    return {
+        {readFloat(cBase + ORIENT_OFFSET), readFloat(cBase + ORIENT_OFFSET + 4), readFloat(cBase + ORIENT_OFFSET + 8)},
+        {readFloat(cBase + ORIENT_OFFSET + 0x10), readFloat(cBase + ORIENT_OFFSET + 0x14), readFloat(cBase + ORIENT_OFFSET + 0x18)},
+        {readFloat(cBase + ORIENT_OFFSET + 0x20), readFloat(cBase + ORIENT_OFFSET + 0x24), readFloat(cBase + ORIENT_OFFSET + 0x28)}
+    }
+end
+
+local active = false
+local debugStr = ''
+
+local function updateDebug(lap, x, y, z, orient, thr, brk, spd, gear, drs, kers)
+    debugStr = string.format(
+        'Current data:\nlap: %d\nx: %.3f; y: %.3f; z: %.3f\norientation:\n{%.3f; %.3f; %.3f;\n %.3f; %.3f; %.3f;\n %.3f; %.3f; %.3f}\nthrottle: %.2f; brake: %.2f\nspeed: %.3f; gear: %d\ndrs: %d; kers: %d',
+        lap, x, y, z,
+        orient[1][1], orient[1][2], orient[1][3],
+        orient[2][1], orient[2][2], orient[2][3],
+        orient[3][1], orient[3][2], orient[3][3],
+        thr, brk, spd, gear, drs, kers)
 end
 
 local frame = 0
@@ -104,7 +158,7 @@ local function openLap(lap)
     if not file then
 
         status = string.format('Failed to open %s', path)
-        SCRIPT_RESULT = status
+        SCRIPT_RESULT = status .. '\n' .. debugStr
 
         return false
     end
@@ -113,7 +167,7 @@ local function openLap(lap)
     index = 0
 
     status = string.format('Lap %d: %d samples', lap, index)
-    SCRIPT_RESULT = status
+    SCRIPT_RESULT = status .. '\n' .. debugStr
 
     return true
 end
@@ -134,7 +188,9 @@ function OnFrame()
     if not active then
         if Keyboard.IsKeyPressed(startKey) then
             active = true
-            SCRIPT_RESULT = 'Logging started'
+            status = 'Waiting for car...'
+            updateDebug(0, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
+            SCRIPT_RESULT = status .. '\n' .. debugStr
         else
             SCRIPT_RESULT = status
         end
@@ -142,18 +198,20 @@ function OnFrame()
     end
 
     if frame % 5 ~= 0 then
-        SCRIPT_RESULT = status
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
     end
 
     local cBase = carBase()
     if not cBase then
         status = 'Waiting for car...'
-        SCRIPT_RESULT = status
+        updateDebug(0, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
     end
 
-    local lap = lapNumber() or 0
+    local lap, lapPtr = lapNumber()
+    lap = lap or 0
     if curLap ~= lap then
         if curLap then
             writeObj(curLap)
@@ -168,11 +226,12 @@ function OnFrame()
         curLap = lap
 
         if not openLap(lap) then
+            updateDebug(lap, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
             return true
         end
     end
     if not file then
-        SCRIPT_RESULT = status
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
 
     end
@@ -180,6 +239,7 @@ function OnFrame()
     local x = readFloat(cBase + 0x1A0)
     local y = readFloat(cBase + 0x1A4)
     local z = readFloat(cBase + 0x1A8)
+    local orient = readOrientation(cBase)
 
     local sAddr = speedAddr()
     local speed = sAddr and readFloat(sAddr) or 0
@@ -187,14 +247,17 @@ function OnFrame()
     local gBase = gearBase()
     local gear = gBase and Memory.ReadMemory(gBase + 0x244, 4) or 0
 
-    local thrPtr = resolve(base + 0xD9A6D8, {0x64,0x78,0x8,0x4,0x4C})
+    local thrPtr = throttleAddr()
     local throttle = thrPtr and readFloat(thrPtr + 0x8) or 0
 
-    local brkPtr = resolve(base + 0xD96F94, {0xF0,0x8,0x3C,0x60,0x4C,0x4})
+    local brkPtr = brakeAddr()
     local brake = brkPtr and readFloat(brkPtr + 0x8) or 0
 
     local drs = gBase and Memory.ReadMemory(gBase + 0x29C, 4) or 0
     local kers = gBase and Memory.ReadMemory(gBase + 0x294, 4) or 0
+
+
+    updateDebug(lap, x, y, z, orient, throttle, brake, speed, gear, drs, kers)
 
     index = index + 1
     file:write(string.format('%d,%.6f,%.6f,%.6f,%.3f,%d,%.2f,%.2f,%d,%d\n',
@@ -202,7 +265,7 @@ function OnFrame()
     table.insert(points, {x, y, z})
 
     status = string.format('Lap %d: %d samples', curLap, index)
-    SCRIPT_RESULT = status
+    SCRIPT_RESULT = status .. '\n' .. debugStr
     return true
 end
 
