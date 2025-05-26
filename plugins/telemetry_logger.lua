@@ -118,11 +118,14 @@ local function brakeAddr()
 end
 
 local frame = 0
+local active = false
 local curLap
 local index = 0
 local file
 local points = {}
+
 local active = false
+
 local debugStr = ''
 
 local function updateDebug(cBase, lapPtr, lap, sAddr, speed, gBase, gear,
