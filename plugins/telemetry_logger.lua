@@ -75,7 +75,7 @@ local function resolve(startAddr, offsets)
     if not addr or addr == 0 then
         return nil
     end
-    for i = 1, #offsets - 1 do
+    for i = 1, #offsets do
         addr = readPtr(addr + offsets[i])
         if not addr or addr == 0 then
             return nil
@@ -216,7 +216,6 @@ function OnFrame()
 
     local lap, lapPtr = lapNumber()
     lap = lap or 0
-
     if curLap ~= lap then
         if curLap then
             writeObj(curLap)
@@ -265,8 +264,6 @@ function OnFrame()
         .. 'thrPtr=0x%X throttle=%.2f brkPtr=0x%X brake=%.2f drs=%d kers=%d',
         cBase or 0, lapPtr or 0, lap, sAddr or 0, speed, gBase or 0, gear,
         thrPtr or 0, throttle, brkPtr or 0, brake, drs, kers))
-
-
     index = index + 1
     file:write(string.format('%d,%.6f,%.6f,%.6f,%.3f,%d,%.2f,%.2f,%d,%d\n',
         index, x, y, z, speed, gear, throttle, brake, drs, kers))
