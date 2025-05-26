@@ -1,6 +1,5 @@
 local ffi = require('ffi')
 
-
 -- simple ini parser for controls section
 local function parseIni(path)
     local data = {}
