@@ -1,5 +1,6 @@
 -- F1 2012 Track Recorder
 
+local ffi = require('ffi')
 local base = Memory.GetModuleBase('F1_2012.exe')
 
 local function resolve(baseAddr, offsets)
@@ -71,7 +72,7 @@ local function saveFiles()
 end
 
 local function readFloat(addr)
-    return Memory.ReadMemory(addr, 4)
+    return ffi.cast('float*', addr)[0]
 end
 
 function OnFrame()
