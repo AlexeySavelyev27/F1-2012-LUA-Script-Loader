@@ -1,16 +1,5 @@
 local ffi = require('ffi')
 
-local function writeLog(message, clear)
-    local mode = clear and 'w' or 'a'
-    local logFile = io.open('telemetry_debug.log', mode)
-    if logFile then
-        logFile:write(os.date('%Y-%m-%d %H:%M:%S') .. ': ' .. message .. '\n')
-        logFile:close()
-    end
-end
-
-writeLog('Starting new session', true)
-
 -- simple ini parser for controls section
 local function parseIni(path)
     local data = {}
@@ -118,10 +107,23 @@ local function brakeAddr()
 end
 
 local frame = 0
+local active = false
 local curLap
 local index = 0
 local file
 local points = {}
+local debugStr = ''
+
+local function updateDebug(cBase, lapPtr, lap, sAddr, speed, gBase, gear,
+    thrPtr, throttle, brkPtr, brake, drs, kers)
+    debugStr = string.format(
+        'Current data: cBase=0x%X lapPtr=0x%X lap=%d sAddr=0x%X speed=%.3f '
+        ..'gBase=0x%X gear=%d thrPtr=0x%X throttle=%.2f brkPtr=0x%X '
+        ..'brake=%.2f drs=%d kers=%d',
+        cBase or 0, lapPtr or 0, lap or 0, sAddr or 0, speed or 0,
+        gBase or 0, gear or 0, thrPtr or 0, throttle or 0,
+        brkPtr or 0, brake or 0, drs or 0, kers or 0)
+end
 local function openLap(lap)
     if file then file:close() end
     local path = string.format('telemetry_lap_%d.csv', lap)
@@ -129,7 +131,7 @@ local function openLap(lap)
     if not file then
 
         status = string.format('Failed to open %s', path)
-        SCRIPT_RESULT = status
+        SCRIPT_RESULT = status .. '\n' .. debugStr
 
         return false
     end
@@ -138,7 +140,7 @@ local function openLap(lap)
     index = 0
 
     status = string.format('Lap %d: %d samples', lap, index)
-    SCRIPT_RESULT = status
+    SCRIPT_RESULT = status .. '\n' .. debugStr
 
     return true
 end
@@ -159,7 +161,9 @@ function OnFrame()
     if not active then
         if Keyboard.IsKeyPressed(startKey) then
             active = true
-            SCRIPT_RESULT = 'Logging started'
+            status = 'Waiting for car...'
+            updateDebug()
+            SCRIPT_RESULT = status .. '\n' .. debugStr
         else
             SCRIPT_RESULT = status
         end
@@ -167,14 +171,15 @@ function OnFrame()
     end
 
     if frame % 5 ~= 0 then
-        SCRIPT_RESULT = status
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
     end
 
     local cBase = carBase()
     if not cBase then
         status = 'Waiting for car...'
-        SCRIPT_RESULT = status
+        updateDebug()
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
     end
 
@@ -198,7 +203,7 @@ function OnFrame()
         end
     end
     if not file then
-        SCRIPT_RESULT = status
+        SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
 
     end
@@ -222,11 +227,8 @@ function OnFrame()
     local drs = gBase and Memory.ReadMemory(gBase + 0x29C, 4) or 0
     local kers = gBase and Memory.ReadMemory(gBase + 0x294, 4) or 0
 
-    writeLog(string.format(
-        'cBase=0x%X lapPtr=0x%X lap=%d sAddr=0x%X speed=%.3f gBase=0x%X gear=%d '
-        .. 'thrPtr=0x%X throttle=%.2f brkPtr=0x%X brake=%.2f drs=%d kers=%d',
-        cBase or 0, lapPtr or 0, lap, sAddr or 0, speed, gBase or 0, gear,
-        thrPtr or 0, throttle, brkPtr or 0, brake, drs, kers))
+    updateDebug(cBase, lapPtr, lap, sAddr, speed, gBase, gear,
+        thrPtr, throttle, brkPtr, brake, drs, kers)
 
     index = index + 1
     file:write(string.format('%d,%.6f,%.6f,%.6f,%.3f,%d,%.2f,%.2f,%d,%d\n',
@@ -234,7 +236,7 @@ function OnFrame()
     table.insert(points, {x, y, z})
 
     status = string.format('Lap %d: %d samples', curLap, index)
-    SCRIPT_RESULT = status
+    SCRIPT_RESULT = status .. '\n' .. debugStr
     return true
 end
 
