@@ -73,7 +73,7 @@ local function resolve(startAddr, offsets)
     if not addr or addr == 0 then
         return nil
     end
-    for i = 1, #offsets do
+    for i = 1, #offsets - 1 do
         addr = readPtr(addr + offsets[i])
         if not addr or addr == 0 then
             return nil
@@ -145,25 +145,10 @@ local function updateDebug(lap, x, y, z, orient, thr, brk, spd, gear, drs, kers)
 end
 
 local frame = 0
-local active = false
 local curLap
 local index = 0
 local file
 local points = {}
-
-local active = false
-
-local debugStr = ''
-
-local function updateDebug(cBase, lapPtr, lap, sAddr, speed, gBase, gear,
-    thrPtr, throttle, brkPtr, brake, drs, kers)
-    debugStr = string.format(
-        'cBase=0x%X lapPtr=0x%X lap=%d sAddr=0x%X speed=%.3f gBase=0x%X gear=%d '
-        .. 'thrPtr=0x%X throttle=%.2f brkPtr=0x%X brake=%.2f drs=%d kers=%d',
-        cBase or 0, lapPtr or 0, lap or 0, sAddr or 0, speed or 0,
-        gBase or 0, gear or 0, thrPtr or 0, throttle or 0, brkPtr or 0,
-        brake or 0, drs or 0, kers or 0)
-end
 local function openLap(lap)
     if file then file:close() end
     local path = string.format('telemetry_lap_%d.csv', lap)
@@ -228,11 +213,6 @@ function OnFrame()
     local brake = brkPtr and readFloat(brkPtr + 0x8) or 0
     local drs = gBase and Memory.ReadMemory(gBase + 0x29C, 4) or 0
     local kers = gBase and Memory.ReadMemory(gBase + 0x294, 4) or 0
-
-    updateDebug(cBase, lapPtr, lap, sAddr, speed, gBase, gear,
-        thrPtr, throttle, brkPtr, brake, drs, kers)
-    writeLog(debugStr)
-
     if not cBase then
         status = 'Waiting for car...'
         updateDebug(0, 0, 0, 0, {{0,0,0},{0,0,0},{0,0,0}}, 0, 0, 0, 0, 0, 0)
