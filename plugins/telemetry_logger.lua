@@ -71,14 +71,17 @@ local function readPtr(addr)
 end
 
 local function resolve(startAddr, offsets)
-    local addr = startAddr
-    for i = 1, #offsets do
+    local addr = readPtr(startAddr)
+    if not addr or addr == 0 then
+        return nil
+    end
+    for i = 1, #offsets - 1 do
         addr = readPtr(addr + offsets[i])
         if not addr or addr == 0 then
             return nil
         end
     end
-    return addr
+    return addr + offsets[#offsets]
 end
 
 local function carBase()
@@ -210,6 +213,10 @@ function OnFrame()
         SCRIPT_RESULT = status .. '\n' .. debugStr
         return true
     end
+
+    local lap, lapPtr = lapNumber()
+    lap = lap or 0
+
     if curLap ~= lap then
         if curLap then
             writeObj(curLap)
@@ -237,6 +244,28 @@ function OnFrame()
     local x = readFloat(cBase + 0x1A0)
     local y = readFloat(cBase + 0x1A4)
     local z = readFloat(cBase + 0x1A8)
+
+    local sAddr = speedAddr()
+    local speed = sAddr and readFloat(sAddr) or 0
+
+    local gBase = gearBase()
+    local gear = gBase and Memory.ReadMemory(gBase + 0x244, 4) or 0
+
+    local thrPtr = throttleAddr()
+    local throttle = thrPtr and readFloat(thrPtr + 0x8) or 0
+
+    local brkPtr = brakeAddr()
+    local brake = brkPtr and readFloat(brkPtr + 0x8) or 0
+
+    local drs = gBase and Memory.ReadMemory(gBase + 0x29C, 4) or 0
+    local kers = gBase and Memory.ReadMemory(gBase + 0x294, 4) or 0
+
+    writeLog(string.format(
+        'cBase=0x%X lapPtr=0x%X lap=%d sAddr=0x%X speed=%.3f gBase=0x%X gear=%d '
+        .. 'thrPtr=0x%X throttle=%.2f brkPtr=0x%X brake=%.2f drs=%d kers=%d',
+        cBase or 0, lapPtr or 0, lap, sAddr or 0, speed, gBase or 0, gear,
+        thrPtr or 0, throttle, brkPtr or 0, brake, drs, kers))
+
 
     index = index + 1
     file:write(string.format('%d,%.6f,%.6f,%.6f,%.3f,%d,%.2f,%.2f,%d,%d\n',
