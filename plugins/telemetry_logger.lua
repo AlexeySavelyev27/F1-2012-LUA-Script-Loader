@@ -95,19 +95,28 @@ local curLap
 local index = 0
 local file
 local points = {}
-local active = false
+
+local status = 'Waiting...'
+
 
 local function openLap(lap)
     if file then file:close() end
     local path = string.format('telemetry_lap_%d.csv', lap)
     file = io.open(path, 'w')
     if not file then
-        SCRIPT_RESULT = string.format('Failed to open %s', path)
+
+        status = string.format('Failed to open %s', path)
+        SCRIPT_RESULT = status
+
         return false
     end
     file:write('index,x,y,z,speed,gear,throttle,brake,drs,kers\n')
     points = {}
     index = 0
+
+    status = string.format('Lap %d: %d samples', lap, index)
+    SCRIPT_RESULT = status
+
     return true
 end
 
@@ -124,7 +133,10 @@ end
 
 function OnFrame()
     frame = frame + 1
-    if frame % 5 ~= 0 then return true end
+    if frame % 5 ~= 0 then
+        SCRIPT_RESULT = status
+        return true
+    end
 
     if not active then
         if Keyboard.IsKeyPressed(startKey) then
@@ -138,7 +150,8 @@ function OnFrame()
 
     local cBase = carBase()
     if not cBase then
-        SCRIPT_RESULT = 'Waiting for car...'
+        status = 'Waiting for car...'
+        SCRIPT_RESULT = status
         return true
     end
 
@@ -155,11 +168,16 @@ function OnFrame()
             return true
         end
         curLap = lap
-        if openLap(lap) then
-            SCRIPT_RESULT = string.format('Started lap %d', lap)
+
+        if not openLap(lap) then
+            return true
         end
     end
-    if not file then return true end
+    if not file then
+        SCRIPT_RESULT = status
+        return true
+
+    end
 
     local x = readFloat(cBase + 0x1A0)
     local y = readFloat(cBase + 0x1A4)
@@ -185,7 +203,8 @@ function OnFrame()
         index, x, y, z, speed, gear, throttle, brake, drs, kers))
     table.insert(points, {x, y, z})
 
-    SCRIPT_RESULT = string.format('Lap %d: %d samples', curLap, index)
+    status = string.format('Lap %d: %d samples', curLap, index)
+    SCRIPT_RESULT = status
     return true
 end
 
@@ -197,5 +216,6 @@ function OnPluginEnd()
     if curLap then
         writeObj(curLap)
     end
-    active = false
+    status = 'Telemetry log saved'
+    SCRIPT_RESULT = status
 end
