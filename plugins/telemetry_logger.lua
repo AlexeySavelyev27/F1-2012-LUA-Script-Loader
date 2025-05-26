@@ -47,6 +47,8 @@ local controls = parseIni(iniPath)
 local startName = controls.StartLogging or 'F9'
 local startKey = keyCode(startName)
 
+local status = string.format('Press %s to start logging', startName)
+
 local function readFloat(addr)
     return ffi.cast('float*', addr)[0]
 end
@@ -95,10 +97,6 @@ local curLap
 local index = 0
 local file
 local points = {}
-
-local status = 'Waiting...'
-
-
 local function openLap(lap)
     if file then file:close() end
     local path = string.format('telemetry_lap_%d.csv', lap)
@@ -133,18 +131,18 @@ end
 
 function OnFrame()
     frame = frame + 1
-    if frame % 5 ~= 0 then
-        SCRIPT_RESULT = status
-        return true
-    end
-
     if not active then
         if Keyboard.IsKeyPressed(startKey) then
             active = true
             SCRIPT_RESULT = 'Logging started'
         else
-            SCRIPT_RESULT = string.format('Press %s to start logging', startName)
+            SCRIPT_RESULT = status
         end
+        return true
+    end
+
+    if frame % 5 ~= 0 then
+        SCRIPT_RESULT = status
         return true
     end
 
