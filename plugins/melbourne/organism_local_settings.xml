@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<settings>
+	<!-- defaults: 450.0-->
+	<drawDistance value = "450.0" />
+	
+	<!-- defaults: <0.25, 0.60, 1.0, 0.25> -->
+	<density practice="0.25" qualify = "0.60" race = "1.0" timetrial = "0.25" />
+</settings>

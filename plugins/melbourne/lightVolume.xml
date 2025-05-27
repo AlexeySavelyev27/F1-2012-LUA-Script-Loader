@@ -1,0 +1,23 @@
+<XML>
+	<SHBox transform="[1,0,0] [0,1,0] [0,0,1] [0.434503,-2.08662,0]" size="[12.9837,12.1539,3.6995]" range="[0,10,1.1]" priority="0.0" name="SH Data01">
+		<LightDefs>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [-3.73737,-0.409657,1.67065]" colour="[1.0, 1.0, 1.0]" intensity="1.5"  attenuationstart="1.41" attenuationend="2.56" name="Omni01"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [-3.73737,-1.89143,1.67065]" colour="[1.0, 1.0, 1.0]" intensity="1.5"  attenuationstart="1.41" attenuationend="2.56" name="Omni04"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [-3.73737,-3.48518,1.67065]" colour="[1.0, 1.0, 1.0]" intensity="1.5"  attenuationstart="1.41" attenuationend="2.56" name="Omni05"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [-0.237985,-1.05831,1.82616]" colour="[1.0, 1.0, 1.0]" intensity="0.5"  attenuationstart="1.17" attenuationend="8.2432" name="Omni06"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [3.88168,-3.48518,1.67065]" colour="[1.0, 1.0, 1.0]" intensity="1.5"  attenuationstart="1.41" attenuationend="2.56" name="Omni07"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [3.88168,-1.89143,1.67065]" colour="[1.0, 1.0, 1.0]" intensity="1.5"  attenuationstart="1.41" attenuationend="2.56" name="Omni08"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [3.88168,-0.409657,1.67065]" colour="[1.0, 1.0, 1.0]" intensity="1.5"  attenuationstart="1.41" attenuationend="2.56" name="Omni09"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [-3.73737,-1.89143,-0.471764]" colour="[1.0, 1.0, 1.0]" intensity="0.3"  attenuationstart="0.51" attenuationend="4.01818" name="Omni10"/>
+			<Light type="Omni" transform="[1,0,0] [0,1,0] [0,0,1] [3.79864,-1.89143,-0.386803]" colour="[1.0, 1.0, 1.0]" intensity="0.3"  attenuationstart="0.51" attenuationend="4.01818" name="Omni11"/>
+			<Light type="Omni" transform="[6.71544e-007,1,0] [0,0,1] [1,-6.71544e-007,0] [-6.34905,-0.493548,1.87788]" colour="[0.866667, 1.0, 0.82353]" intensity="0.3"  attenuationstart="0.19" attenuationend="0.753408" name="Omni02"/>
+			<Light type="Omni" transform="[6.71544e-007,1,0] [0,0,1] [1,-6.71544e-007,0] [-6.3493,-4.52976,1.88548]" colour="[0.866667, 1.0, 0.82353]" intensity="0.3"  attenuationstart="0.19" attenuationend="0.753408" name="Omni03"/>
+			<Light type="Omni" transform="[0,1,0] [-0.173648,0,0.984808] [0.984808,0,0.173648] [-6.30629,-2.55527,1.54739]" colour="[1.0, 0.0, 0.0]" intensity="0.1"  attenuationstart="0.0" attenuationend="0.865024" name="Omni12"/>
+			<Light type="Omni" transform="[0,1,0] [0,0,1] [1,0,0] [-5.92498,-2.02237,0.565463]" colour="[1.0, 1.0, 1.0]" intensity="0.05"  attenuationstart="0.0" attenuationend="10.9803" name="Omni13"/>
+			<Light type="Omni" transform="[6.71544e-007,1,0] [0,0,1] [1,-6.71544e-007,0] [6.31757,-3.96716,1.77245]" colour="[0.866667, 1.0, 0.82353]" intensity="0.3"  attenuationstart="0.19" attenuationend="0.753408" name="Omni14"/>
+			<Light type="Omni" transform="[0,1,0] [-0.173648,0,0.984808] [0.984808,0,0.173648] [6.29473,-2.41945,1.81723]" colour="[1.0, 0.0, 0.0]" intensity="0.1"  attenuationstart="0.0" attenuationend="0.865024" name="Omni15"/>
+			<Light type="Omni" transform="[6.71544e-007,1,0] [0,0,1] [1,-6.71544e-007,0] [6.32886,-0.950946,1.804]" colour="[0.866667, 1.0, 0.82353]" intensity="0.3"  attenuationstart="0.19" attenuationend="0.753408" name="Omni16"/>
+			<Light type="Omni" transform="[0,1,0] [0,0,1] [1,0,0] [5.91196,-2.02237,0.565463]" colour="[1.0, 1.0, 1.0]" intensity="0.05"  attenuationstart="0.0" attenuationend="10.9803" name="Omni17"/>
+		</LightDefs>
+	</SHBox>
+</XML>

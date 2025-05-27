@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dataset>
+  <pssg processor="OrganismPlugin" filename="/data/anims/crowd_anims.pssg" userdata="hla"/>
+  <pssg processor="OrganismPlugin" filename="/data/anims/cr_billboard.pssg" userdata="billboard"/>
+  <pssg processor="OrganismPlugin" filename="/data/anims/cr_camera_flash.pssg" userdata="camFlash"/>
+  <pssg processor="OrganismPlugin" filename="/data/anims/cr_male.pssg" userdata="maleVariant0" /> 
+  <pssg processor="OrganismPlugin" filename="/data/anims/cr_female.pssg" userdata="femaleVariant0"/>
+  <pssg processor="OrganismPlugin" filename="/data/anims/marshall.pssg" userdata="marshall"/>
+</dataset>
