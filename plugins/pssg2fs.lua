@@ -1,4 +1,5 @@
 local ffi = require('ffi')
+local bit = require('bit')
 local kernel32 = ffi.load('kernel32')
 
 local function writeLog(message, clear)
@@ -14,12 +15,60 @@ writeLog('Starting new session', true)
 
 ffi.cdef[[
 unsigned int GetModuleFileNameA(void* hModule, char* lpFilename, unsigned int size);
+typedef struct {
+    unsigned int dwFileAttributes;
+    unsigned int ftCreationTimeLow;
+    unsigned int ftCreationTimeHigh;
+    unsigned int ftLastAccessTimeLow;
+    unsigned int ftLastAccessTimeHigh;
+    unsigned int ftLastWriteTimeLow;
+    unsigned int ftLastWriteTimeHigh;
+    unsigned int nFileSizeHigh;
+    unsigned int nFileSizeLow;
+    unsigned int dwReserved0;
+    unsigned int dwReserved1;
+    char cFileName[260];
+    char cAlternateFileName[14];
+} WIN32_FIND_DATAA;
+void* FindFirstFileA(const char* lpFileName, WIN32_FIND_DATAA* lpFindFileData);
+int FindNextFileA(void* hFindFile, WIN32_FIND_DATAA* lpFindFileData);
+int FindClose(void* hFindFile);
 ]]
 
 local pluginDir = debug.getinfo(1, 'S').source:match('@(.+)[/\\]')
 local basePath = pluginDir .. '/pssg2fs/'
 writeLog('Plugin directory: ' .. pluginDir)
 writeLog('Base path: ' .. basePath)
+
+local FILE_ATTRIBUTE_DIRECTORY = 0x10
+local INVALID_HANDLE_VALUE = ffi.cast('void*', -1)
+
+local fileCatalog = {}
+
+local function scanDir(dir, rel)
+    local search = dir .. '\\*'
+    local data = ffi.new('WIN32_FIND_DATAA')
+    local handle = kernel32.FindFirstFileA(search, data)
+    if handle == INVALID_HANDLE_VALUE then return end
+    repeat
+        local name = ffi.string(data.cFileName)
+        if name ~= '.' and name ~= '..' then
+            local full = dir .. '\\' .. name
+            local r = rel .. name
+            if bit.band(data.dwFileAttributes, FILE_ATTRIBUTE_DIRECTORY) ~= 0 then
+                scanDir(full, r .. '\\')
+            else
+                fileCatalog[r:lower()] = full
+            end
+        end
+    until kernel32.FindNextFileA(handle, data) == 0
+    kernel32.FindClose(handle)
+end
+
+scanDir(basePath, '')
+local count = 0
+for _ in pairs(fileCatalog) do count = count + 1 end
+writeLog('Cataloged ' .. tostring(count) .. ' files')
 
 local exeBase = Memory.GetModuleBase('F1_2012.exe')
 local buf = ffi.new('char[260]')
@@ -62,8 +111,7 @@ local function readString(addr)
 end
 
 function OnBreakpoint(address)
-    local regs = Registers.Get()
-    local ptr = Memory.ReadMemory(regs.esp + 4, 4)
+    local ptr = Memory.ReadMemory(exeBase + 0x509654, 4)
     if not ptr or ptr == 0 then return end
     local original = readString(ptr)
     writeLog('Intercepted path: ' .. original)
@@ -73,18 +121,15 @@ function OnBreakpoint(address)
         relative = relative:gsub(pattern, '')
     end
     writeLog('Relative path: ' .. relative)
-    local newPath = basePath .. relative
-    writeLog('Looking for: ' .. newPath)
-    local file = io.open(newPath, 'rb')
-    if file then
-        file:close()
-        writeLog('Redirecting to: ' .. newPath)
-        local mem = Memory.AllocateMemory(#newPath + 1)
-        for i = 1, #newPath do
-            Memory.WriteMemory(mem + i - 1, newPath:byte(i), 1)
+    local lookup = fileCatalog[relative:lower()]
+    if lookup then
+        writeLog('Redirecting to: ' .. lookup)
+        local mem = Memory.AllocateMemory(#lookup + 1)
+        for i = 1, #lookup do
+            Memory.WriteMemory(mem + i - 1, lookup:byte(i), 1)
         end
-        Memory.WriteMemory(mem + #newPath, 0, 1)
-        Memory.WriteMemory(regs.esp + 4, mem, 4)
+        Memory.WriteMemory(mem + #lookup, 0, 1)
+        Memory.WriteMemory(exeBase + 0x509654, mem, 4)
     else
         writeLog('File not found, using original')
     end
