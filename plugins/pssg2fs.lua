@@ -61,7 +61,7 @@ end
 function OnFrame()
     if not breakpointSet then
         local base = Memory.GetModuleBase('F1_2012.exe')
-        if base and Debug.SetBreakpoint(base + 0x4C2706, 'OnBreakpoint') then
+        if base and Debug.SetBreakpoint(base + 0x4C3306, 'OnBreakpoint') then
             SCRIPT_RESULT = 'pssg2fs active'
             breakpointSet = true
         else
