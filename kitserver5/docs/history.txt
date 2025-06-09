@@ -1,0 +1,141 @@
+Kitserver 5 HISTORY notes
+=========================
+
+
+2023-02-05
+----------
+v5.7.2
+- fserv: fixing problems with mixed-up HD hair 
+
+
+2021-06-28
+----------
+v5.7.1
+- kserv: fixes for the following issues, introduced in 5.7.0:
+    - possible "2nd-match-crash" (where first match works, but second may crash before starting)
+    - Edit mode correction for "Edit Player Number" page
+
+
+2021-06-27
+----------
+v5.7.0
+- kserv: supporting different models for player/goalkeeper kits
+  on the same team. (This removes the internal limitation that
+  the game had, where PL and GK had to use the same model, or
+  otherwise the kits would be distorted on the goalkeeper)
+  Again, thanks to Ciais, who advocated for this feature :-)
+- bootserver: optimizations for HD boot support
+
+
+2021-05-04
+----------
+v5.6.3
+- bootserver: support for HD boot images in GDB. Thanks, Ciais!
+- kserv: fix for mini-kits issues introduced in 5.6.2
+- kload: new option "font-size.factor" in kload.cfg
+
+
+2020-08-25
+----------
+v5.6.2
+- kserv: added support for mini-kit rendering of PES6 kit models
+- kserv: support for square textures (such as standard 512x512 pes6 kits, 1024x1024, etc.)
+    (before this version, trying to use such textures would crash the game)
+
+
+2020-06-18
+----------
+v5.6.1
+- kserv: added "alwaysUseAlphaMask" option for kserv.cfg
+
+
+2018-04-22
+----------
+v5.6.0
+- fserv: fixes for HD face/hair
+
+
+2018-01-25
+----------
+v5.5.9
+- fserv: HD faces and hair
+- kserv: exact radar.color (from config.txt) is enforced for in-game radar
+- bserv: added support for home ball and auto-randome mode (as in ks6)
+- kload: fixed bug which led to problems with looped ADX sound tracks
+
+
+2018-01-10
+----------
+v5.5.8
+- kserv: fixed bug introduced in 5.5.7: game would crash on match load, if a team was
+         selected that was specified in GDB/uni/map.txt, but didn't have one of the
+         standard kits: pa/pb/ga/gb. This problem is now fixed.
+- bserv: hot keys can now be re-mapped in bserv.cfg
+
+
+2018-01-09
+----------
+v5.5.7
+- kserv: fix for transparency handling of 32-bit RGBA kit images
+- kserv: kits of all dimensions (not just multiples of 512x256) can now be mixed correctly
+- kserv: support for kit overlays - "overlay" attribute in config.txt
+- kserv: support for "shorts.color" attribute
+- kserv: fixed logic for displaying kit names/descriptions
+
+
+2017-12-30
+----------
+v5.5.6
+- lodmixer/lodcfg: added support for manual aspect ratio correction
+  this feature was actually done in 2012, but got lost when source code
+  was moved to Github. Now it is back :)
+- stadium: minor tweak for iterator logic
+
+
+2017-12-20
+----------
+v5.5.5
+- stadium: fixed crash, which occured if switching stadium-server mode
+  from "Home stadium" to random GDB stadium, but no home stadium had been
+  actually assigned for the current home team.
+
+
+2017-12-19
+----------
+v5.5.4
+- kload, afs2fs: fixes for large files, which are read in chunks. HD crowd now works!
+- bserv, network: fixed conflicts with afs2fs module
+- stadium: state is now saved in "stadium.dat" file
+
+
+2017-12-15
+----------
+v5.5.3
+- kserv: fixed crashes related to 2D-kit texture release.
+- kserv: fixed bug, where GK narrow-back 2D-kit were incorrectly rendered.
+- kload: support for "reserved.memory" to support big HD stadiums
+
+
+2017-12-14
+----------
+v5.5.1
+- dxtools: added internal resolution width/height. Thanks to Kingsley813!
+- kserv: small fixes to texture-release logic
+- kload: exit logic clean-up. Game should no longer crash/hang on exit
+
+
+2017-12-12
+----------
+v5.5.0
+- bserv: fixed game crashes after ball was swiched between matches.
+- bootserv: fixed problems in newer Windows (7 and 10), where boots were
+  getting mixed up or disappeared after halftime.
+
+
+2011-01-03
+----------
+v5.4.0
+- last official "final" release. Before that there are no history notes,
+  only git commits here: https://github.com/kitserver/kitserver5
+  Read them if you are interested :)
+  
