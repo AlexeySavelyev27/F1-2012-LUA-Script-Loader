@@ -8,6 +8,7 @@
 	local initialized2 = false
     local trackDatabase = {}  -- Will store found tracks
     local customCalendar = {}  -- Will store the user calendar
+    local midSeasonRace = 0
     local originalArray = {start = 0, end_ = 0, size = 0}  -- Original array
     local customArray = {address = 0, size = 0}  -- Our first custom array (track pointers)
     local customStructure = {address = 0, size = 0}  -- Our second custom array (full structure)
@@ -238,6 +239,7 @@
         end
 
         local inCareerSection = false
+        local inSettingsSection = false
         local calendar = {}
 
         for line in iniFile:lines() do
@@ -246,8 +248,13 @@
 
             if line:match("^%[career%]") then
                 inCareerSection = true
+                inSettingsSection = false
+            elseif line:match("^%[settings%]") then
+                inCareerSection = false
+                inSettingsSection = true
             elseif line:match("^%[") then
                 inCareerSection = false
+                inSettingsSection = false
             elseif inCareerSection and line ~= "" then
                 -- Format: number. "track name", flag
                 local position, trackName, flag = line:match("(%d+)%.%s*\"([^\"]+)\"%s*,%s*(%d+)")
@@ -263,6 +270,11 @@
                         flag = tonumber(flag)
                     }
                 end
+            elseif inSettingsSection and line ~= "" then
+                local key, value = line:match("([^=]+)%s*=%s*(%d+)")
+                if key and value and key:lower() == "midseasonrace" then
+                    midSeasonRace = tonumber(value)
+                end
             end
         end
 
@@ -273,6 +285,8 @@
             writeLog("Error: Calendar in INI file is empty or has incorrect format")
             return false
         end
+
+        writeLog("MidSeasonRace setting: " .. tostring(midSeasonRace))
 
         customCalendar = calendar
 
@@ -564,11 +578,11 @@
         return true
     end
 
-	local function secondModifier()
-		--This is very important for proper size checks
-		local base = Memory.GetModuleBase("F1_2012.exe")
-		local StructSize = customArray.count * 8 + 24
-		local StructSize2 = customArray.count * 8 + 28
+        local function secondModifier()
+                --This is very important for proper size checks
+                local base = Memory.GetModuleBase("F1_2012.exe")
+                local StructSize = customArray.count * 8 + 24
+                local StructSize2 = customArray.count * 8 + 28
 
 
         Memory.WriteMemory(base + 0xC00 + 0x3E2699, StructSize, 1)
@@ -576,8 +590,32 @@
 		Memory.WriteMemory(base + 0xC00 + 0x3E26C8, StructSize, 1)
 		Memory.WriteMemory(base + 0xC00 + 0x666B9, StructSize2, 1)
 
-		return true
-	end
+                return true
+        end
+
+        local function applyMidSeasonRace()
+                local base = Memory.GetModuleBase("F1_2012.exe")
+                if not base then return false end
+
+                Memory.WriteMemory(base + 0xD913A0, midSeasonRace, 1)
+
+                local structBase = base + 0xDCE760
+                local check = Memory.ReadMemory(structBase - 4, 4)
+                if not check or check == 0 then
+                        writeLog("Mid-season structure not available")
+                        return false
+                end
+
+                local value = midSeasonRace * 64
+                local offsets = {0x1BE, 0x1F4, 0x278, 0x656, 0x662, 0x950,
+                                 0xAFA, 0xC2C, 0xC80, 0xC9E, 0xCAA, 0x1010,
+                                 0x104C, 0x1130, 0x17BA, 0x181A, 0x1C16,
+                                 0x22CA}
+                for _, ofs in ipairs(offsets) do
+                        Memory.WriteMemory(structBase + ofs, value, 2)
+                end
+                return true
+        end
 
 
     -- Function to initialize the modification
@@ -619,6 +657,11 @@
             return false
         end
 
+        local base = Memory.GetModuleBase("F1_2012.exe")
+        if base then
+            Memory.WriteMemory(base + 0xD913A0, midSeasonRace, 1)
+        end
+
         writeLog("Initialization completed successfully")
         SCRIPT_RESULT = "Custom calendar activated (" ..
                         customArray.count .. " races). Waiting for save..."
@@ -636,10 +679,12 @@
             return false
         end
 
-		if not secondModifier() then
+                if not secondModifier() then
             SCRIPT_RESULT = "Failed to modify custom structure"
             return false
         end
+
+                applyMidSeasonRace()
 
 		writeLog("Initialization completed successfully")
         SCRIPT_RESULT = "Save modified! Custom calendar successfully launched with (" ..
