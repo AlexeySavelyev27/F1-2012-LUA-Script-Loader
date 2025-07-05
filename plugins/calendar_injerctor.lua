@@ -597,9 +597,7 @@
                 local base = Memory.GetModuleBase("F1_2012.exe")
                 if not base then return false end
 
-                Memory.WriteMemory(base + 0xD913A0, midSeasonRace, 1)
-
-                local structBase = base + 0xDCE760
+                local structBase = Memory.ReadMemory(base + 0xDCE760, 4)
                 local check = Memory.ReadMemory(structBase - 4, 4)
                 if not check or check == 0 then
                         writeLog("Mid-season structure not available")
@@ -607,13 +605,41 @@
                 end
 
                 local value = midSeasonRace * 64
-                local offsets = {0x1BE, 0x1F4, 0x278, 0x656, 0x662, 0x950,
-                                 0xAFA, 0xC2C, 0xC80, 0xC9E, 0xCAA, 0x1010,
-                                 0x104C, 0x1130, 0x17BA, 0x181A, 0x1C16,
-                                 0x22CA}
-                for _, ofs in ipairs(offsets) do
-                        Memory.WriteMemory(structBase + ofs, value, 2)
-                end
+				--Team Evaluation Round
+				Memory.WriteMemory(structBase + 0x1BE, value, 2)
+				
+				--Mid-season contract Round
+				Memory.WriteMemory(structBase + 0x1130, value, 2)
+				
+				--Different Team Offer Round (bigger than)
+				Memory.WriteMemory(structBase + 0x1010, value, 2)
+				
+				--Memory.WriteMemory(structBase + 0x1F4, value, 2)
+				--Memory.WriteMemory(structBase + 0x278, value, 2)
+				--Memory.WriteMemory(structBase + 0x656, value, 2)
+				--Memory.WriteMemory(structBase + 0x662, value, 2)
+				--Memory.WriteMemory(structBase + 0x950, value, 2)
+				--Memory.WriteMemory(structBase + 0xAFA, value, 2)
+				--Memory.WriteMemory(structBase + 0xC2C, value, 2)
+				--Memory.WriteMemory(structBase + 0xC80, value, 2)
+				--Memory.WriteMemory(structBase + 0xC9E, value, 2)
+				--Memory.WriteMemory(structBase + 0xCAA, value, 2)
+				--Memory.WriteMemory(structBase + 0x104C, value, 2)
+				--Memory.WriteMemory(structBase + 0x17BA, value, 2)
+				--Memory.WriteMemory(structBase + 0x181A, value, 2)
+			    --Memory.WriteMemory(structBase + 0x1C16, value, 2)
+				--Memory.WriteMemory(structBase + 0x22CA, value, 2)
+				--Memory.WriteMemory(structBase + 0x1890, value, 2)
+				--Memory.WriteMemory(structBase + 0x18B4, value, 2)
+				
+
+                --local offsets = {0x1BE, 0x1F4, 0x278, 0x656, 0x662, 0x950,
+                --                 0xAFA, 0xC2C, 0xC80, 0xC9E, 0xCAA, 0x1010,
+                --                 0x104C, 0x1130, 0x17BA, 0x181A, 0x1C16,
+                --                 0x22CA}
+                --for _, ofs in ipairs(offsets) do
+                --        Memory.WriteMemory(structBase + ofs, value, 2)
+                --end
                 return true
         end
 
@@ -658,8 +684,26 @@
         end
 
         local base = Memory.GetModuleBase("F1_2012.exe")
+		local pointer1 = Memory.ReadMemory(base + 0xDDB23C, 4)
+		local pointer2 = Memory.ReadMemory(pointer1 + 0x10, 4)
+		local pointer3 = Memory.ReadMemory(pointer2 + 0x60, 4)
         if base then
-            Memory.WriteMemory(base + 0xD913A0, midSeasonRace, 1)
+            Memory.WriteMemory(pointer3 + 0xEC, midSeasonRace - 1, 1)
+			--Memory.WriteMemory(base + 0xD913A0, midSeasonRace - 1, 1)
+			
+			--Team Evaluation icon
+			Memory.WriteMemory(base + 0x7D2F2, midSeasonRace - 1, 1)
+			
+			--Memory.WriteMemory(base + 0xC8F05C, 10, 1)
+			--Memory.WriteMemory(base + 0xC8F060, 9, 1)
+			--Memory.WriteMemory(base + 0xC8F064, 8, 1)
+			--Memory.WriteMemory(base + 0xC8F068, 7, 1)
+			--Memory.WriteMemory(base + 0xC8F06C, 6, 1)
+			--Memory.WriteMemory(base + 0xC8F070, 5, 1)
+			--Memory.WriteMemory(base + 0xC8F074, 4, 1)
+			--Memory.WriteMemory(base + 0xC8F078, 3, 1)
+			--Memory.WriteMemory(base + 0xC8F07C, 2, 1)
+			--Memory.WriteMemory(base + 0xC8F080, 1, 1)
         end
 
         writeLog("Initialization completed successfully")
